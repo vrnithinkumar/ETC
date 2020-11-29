@@ -1,4 +1,4 @@
--module(etc_rebar_plug_prv).
+-module(etc_plug).
 
 -export([init/1, do/1, format_error/1]).
 
