@@ -15,7 +15,6 @@
 %% ===================================================================
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    io:format("Init state~n"),
     Provider = providers:create([
             {name, ?PROVIDER},            % The 'user friendly' name of the task
             {module, ?MODULE},            % The module implementation of the task
@@ -23,17 +22,14 @@ init(State) ->
             {deps, ?DEPS},                % The list of dependencies
             {example, "rebar3 etc_plug"}, % How to use the plugin
             {opts, []},                   % list of options understood by the plugin
-            {short_desc, "A rebar plugin"},
-            {desc, "A rebar plugin"}
+            {short_desc, "A rebar plugin for etc"},
+            {desc, "A rebar plugin erlang type checker"}
     ]),
     {ok, rebar_state:add_provider(State, Provider)}.
 
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    io:format("Do state~n"),
-    CodePaths = rebar_state:code_paths(State, all_deps),
-    ?PRINT(CodePaths),
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     CheckedApps = lists:map(fun gradualizer_check_app/1, rebar_state:project_apps(State)),
     HasNok = lists:member(nok, CheckedApps),
@@ -57,7 +53,6 @@ gradualizer_check_app(App) ->
 files_to_check(App) ->
 
     Opts = rebar_app_info:opts(App),
-    ?PRINT(Opts),
     Deps = rebar_app_info:deps(App),
     ?PRINT(Deps),
     OutDir = rebar_app_info:out_dir(App),
