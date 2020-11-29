@@ -1,0 +1,4 @@
+[{<<"erlscp">>,
+  {git,"git://github.com/fenollp/erlscp.git",
+       {ref,"9d283b2721486c891e7baa302e5746163ccb3e2c"}},
+  0}].
