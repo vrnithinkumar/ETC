@@ -27,7 +27,7 @@ Using With Rebar3
 Add the plugin to your rebar config:
 
     {plugins, [
-        {etc_plug, {git, "https://github.com/vrnithinkumar/ETC.git", {branch, "main"}}}
+        {etc_plug, {git, "https://github.com/vrnithinkumar/ETC.git", {branch, "master"}}}
     ]}.
 
 Then just call your plugin directly in an existing application:
