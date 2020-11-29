@@ -23,6 +23,7 @@
 -type expr() :: var() | {op,lno(),atom(),expr(),expr()}.
 
 main(Args0) ->
+    ?PRINT(Args0),
     ets:new(compile_config, [set, named_table, public]),
     Args = ["+{parse_transform, tidy}"] ++ 
     case lists:member("+noti",Args0) of
