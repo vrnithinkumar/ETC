@@ -31,7 +31,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
-    CheckedApps = lists:map(fun gradualizer_check_app/1, rebar_state:project_apps(State)),
+    CheckedApps = lists:map(fun etc_check_app/1, rebar_state:project_apps(State)),
     HasNok = lists:member(nok, CheckedApps),
     if
         HasNok -> {error, {?MODULE, undefined}};
@@ -43,9 +43,10 @@ do(State) ->
 format_error(_) ->
     "ETC found errors.".
 
--spec gradualizer_check_app(rebar_app_info:t()) -> ok | nok.
-gradualizer_check_app(App) ->
+-spec etc_check_app(rebar_app_info:t()) -> ok | nok.
+etc_check_app(App) ->
     Files = files_to_check(App),
+    lists:map(fun (F) -> etc:main(F) end, Files),
     ?PRINT(Files),
     ok.
 
@@ -58,9 +59,9 @@ files_to_check(App) ->
     OutDir = rebar_app_info:out_dir(App),
     ?PRINT(OutDir),
 
-    GOpts = rebar_app_info:get(App, gradualizer_opts, []),
-    Include = proplists:get_value(include, GOpts, undefined),
-    Exclude = proplists:get_value(exclude, GOpts, []),
+    ETCOpts = rebar_app_info:get(App, etc_opts, []),
+    Include = proplists:get_value(include, ETCOpts, undefined),
+    Exclude = proplists:get_value(exclude, ETCOpts, []),
     Cwd = rebar_app_info:dir(App),
 
     Patterns = case Include of
@@ -89,8 +90,6 @@ files_to_check(App) ->
         fun (File) ->
             not lists:member(File, ExpandedExclude)
         end, ExpandedFiles).
-
-
 
 -spec resolve_src_dirs(dict:dict()) -> {[file:name()], [file:name()]}.
 resolve_src_dirs(Opts) ->
