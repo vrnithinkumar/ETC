@@ -46,7 +46,8 @@ format_error(_) ->
 -spec etc_check_app(rebar_app_info:t()) -> ok | nok.
 etc_check_app(App) ->
     Files = files_to_check(App),
-    lists:map(fun (F) -> etc:main(F) end, Files),
+    % lists:map(fun (F) -> etc:main(F) end, Files),
+    etc:main("/Users/vr/WorkSpace/Thesis/test_project/hello/src/hello.erl"),
     ?PRINT(Files),
     ok.
 
