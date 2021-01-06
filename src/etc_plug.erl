@@ -50,6 +50,7 @@ etc_check_app(App) ->
     lists:map(fun (F) -> etc:main([F]) end, Files),
     ok.
 
+%% get files to run the type checker.
 -spec files_to_check(rebar_app_info:t()) -> [file:name()].
 files_to_check(App) ->
 
