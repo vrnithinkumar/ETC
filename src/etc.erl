@@ -95,7 +95,10 @@ parse_transform(Forms,_) ->
             end, env:readModuleBindings(Module)),
             io:fwrite("~n",[])
     catch
-        error:{type_error,Reason} -> erlang:error("Type Error: " ++ Reason)
+        error:{type_error,Reason} -> 
+            % Trace = erlang:get_stacktrace(),
+            % erlang:display(Trace),
+            erlang:error("Type Error: " ++ Reason)
     end,
     pp:eraseAnn(Forms).
 
@@ -130,14 +133,16 @@ typeCheckSCC(Functions,Env) ->
         FunQName = util:getFnQName(F),
         {T,Cs,Ps} = infer(FreshEnv,F),
         % ?PRINT(T),
-        % ?PRINT(Cs),
         % ?PRINT(Ps),
         {FreshT,_} = lookup(FunQName, FreshEnv, util:getLn(F)),
+        % ?PRINT(FreshT),
         { unify(T, FreshT) ++ Cs ++ AccCs
         , Ps ++ AccPs}
     end, {[],[]}, Functions),
     % Solve unification constraints
+    ?PRINT(InfCs),
     Sub             = hm:solve(InfCs),
+    ?PRINT(Sub),
     Ps              = hm:subPs(InfPs,Sub),
     % predicate solving leads in a substitution since 
     % oc predicates are basically ambiguous unification constraints
@@ -166,7 +171,6 @@ infer(_,{float,L,_}) ->
     {hm:bt(float,L),[],[]}; 
 infer(Env,{clause,L,_,_,_}=Node) ->       
     ClausePatterns = clause_patterns(Node),
-    % ?PRINT(ClausePatterns),
     % Infer types of arguments (which are in the form of patterns)
     % Env_ is Env extended with arg variables
     {ArgTypes, Env_, CsArgs, PsArgs} = inferPatterns(Env,ClausePatterns),
@@ -390,7 +394,7 @@ infer(Env,{'try',L,TryExprs,[],CatchClauses,AfterExprs}) ->
             , TrCs ++ CatchCs ++ unify([TrT|CatchBodTs]) ++ AfterCs
             ,TrPs ++ CatchPs ++ AfterPs}
     end;     
-infer(Env,Node) ->
+infer(Env, Node) ->
     case type(Node) of
         Fun when Fun =:= function; Fun =:= fun_expr ->
             Clauses = case Fun of 
@@ -399,7 +403,6 @@ infer(Env,Node) ->
             end,
             % list of clause inference results
             ClausesInfRes = lists:map(fun(C) -> infer(Env,C) end, Clauses),
-            % ?PRINT(ClausesInfRes),
             % "flatten" clause inference results
             {InfTypes, InfCs, InfPs} = lists:foldr(
                 fun({T,Cs,Ps}, {AccTypes,AccCs,AccPs}) 
@@ -407,12 +410,34 @@ infer(Env,Node) ->
                 end
                 , {[],[],[]}, ClausesInfRes),
             % Unify the types of all clauses 
-            UniCs = unify(InfTypes),
+            % ?PRINT(InfTypes),
+            % ?PRINT(InfCs),
+            % ?PRINT(InfPs),
+            RUT = unionFuncTypes(InfTypes),
+            UniCs = unifyJust([RUT] ++ InfTypes),
+            ?PRINT(RUT),
             % pick the type of any one clause as the type of fn
-            {lists:last(InfTypes), InfCs ++ UniCs, InfPs};
+            {RUT, InfCs ++ UniCs, InfPs};
         X -> erlang:error({type_error," Cannot infer type of " 
             ++ util:to_string(Node) ++ " with node type "++ util:to_string(X)})
     end.
+
+unionFuncTypes(FuncTypes)->
+    {funt, L, Args, _} = lists:last(FuncTypes),
+    ArgTs = lists:map(fun({funt, _, As, _}) -> As end, FuncTypes),
+    RTs = lists:map(fun({funt, _, _, R}) -> R end, FuncTypes),
+    URTs = remove_dups(RTs),
+    ?PRINT(URTs),
+    ?PRINT(ArgTs),
+    ?PRINT(RTs),
+    RUT = hm:tcon("Union", URTs, L),
+    case length(URTs) of
+        1 -> lists:last(FuncTypes);
+        _ -> {funt, L, Args, RUT}
+    end.
+
+remove_dups([])    -> [];
+remove_dups([H|T]) -> [H | [X || X <- remove_dups(T), not hm:is_same(X, H)]].
 
 inferExprs(Env,Exprs) ->
     {Env_, CsBody, PsBody} = lists:foldl(fun(Expr, {Ei,Csi,Psi}) -> 
@@ -490,11 +515,11 @@ checkExpr(Env,ExprNode) ->
     {[hm:types()],hm:env(),[hm:constraint()],[hm:predicate()]}.
 inferPatterns(Env,ClausePatterns) ->
     lists:foldl(
-        fun(Pattern,{AccTs,AccEnv,AccCs,AccPs}) ->
-            {Env_, _, _} = checkExpr(AccEnv,Pattern),
-            {InfT, InfCs, InfPs} = infer(env:setPatternInf(Env_),Pattern),
+        fun(Pattern, {AccTs, AccEnv, AccCs, AccPs}) ->
+            {Env_, _, _} = checkExpr(AccEnv, Pattern),
+            {InfT, InfCs, InfPs} = infer(env:setPatternInf(Env_), Pattern),
             {AccTs ++ [InfT], Env_, AccCs ++ InfCs, AccPs ++ InfPs }
-        end, {[],Env,[],[]} ,ClausePatterns).
+        end, {[],Env,[],[]}, ClausePatterns).
 
 % infer the type of expression on the left of an application
 -spec inferFn(hm:env(),erl_syntax:syntaxTree(),integer()) -> 
@@ -585,17 +610,25 @@ checkLCDefs(Env,Exprs) ->
 % "pseudo unify" which returns constraints
 -spec unify([hm:type()]) -> [hm:constraint()].
 unify(Types) ->
+    % We try to create pairs and return the remaining odd one.
     {Constraints, RemType} = util:pairwiseChunk(Types),
     RemConstraints = 
         case RemType of
             {nothing} -> [];
             {just, X} -> 
                 case length(Constraints) of
-                    L when L > 0    -> [{X, element(2,lists:last(Constraints))}];
-                    _               -> []
+                    % element(2,lists:last(Constraints))} returns the b from [{a,b}]
+                    % element is for tuple indexed from 1
+                    L when L > 0 -> [{X, element(2,lists:last(Constraints))}];
+                    _            -> []
                 end
         end,
     Constraints ++ RemConstraints.
+
+% some hack to test
+-spec unifyJust([hm:type()]) -> [hm:constraint()].
+unifyJust([HT|Types]) ->
+    lists:map(fun(T) -> {HT, T} end, Types).
 
 % "pseudo unify" which returns constraints
 -spec unify(hm:type(),hm:type()) -> [hm:constraint()].
@@ -857,13 +890,11 @@ specToType({QFName, Types}) ->
 
 checkWithSpec(Spec, X, T) -> 
     SpecTs = spec:lookup(X, Spec),
-    % ?PRINT(SpecTs),
-    % ?PRINT(T),
     case SpecTs of 
         undefined -> [];
          _ ->
         Lines = lists:map(fun(ST) -> hm:getLn(ST) end, SpecTs),
-        Same = not lists:member(false, lists:map(fun(ST) -> hm:is_same(ST, T) end, SpecTs)),
+        Same = not lists:member(false, lists:map(fun(ST) -> hm:is_same_error_msg(ST, T) end, SpecTs)),
         case Same of
             true  -> io:fwrite("Same as type spec defined in lines ~p ~n", [Lines]);
             false -> io:fwrite("Different from type defined in lines ~p ~n", [Lines])

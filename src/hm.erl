@@ -8,14 +8,17 @@
 -export([bt/2,funt/3,tvar/2,tcon/3,forall/4]).
 -export([freshen/1,generalize/3,eqType/2,fresh/1]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/3]).
--export([is_same/2]).
--export_type([constraint/0,type/0]).
+-export([is_same/2, is_same_error_msg/2]).
+-export_type([constraint/0, subset/0, type/0]).
 
 
 -type tvar() :: any().
 -type sub() :: maps:map(). % Map <tvar(),type()>
 
 -type constraint() :: {type(), type()}.
+
+% sub set relation for union types%
+-type subset() :: {type(), type()}.
 
 -type class() :: string().
 -type predicate() :: {class, class(), type()} | {oc, type(),[type()]}.
@@ -48,14 +51,18 @@ forall (X,P,A,L)  -> {forall, tvar(X,L), P, A}.
 solve(Cs) -> solve(Cs, emptySub()).
 
 -spec solve([constraint()], sub()) -> sub().
-solve ([],Sub) -> Sub;
-solve ([{T1,T2}|Cs],Sub) ->
+solve([], Sub) -> Sub; % empty constraints
+solve([{T1,T2}|Cs],Sub) ->
+    % ?PRINT(Cs),
+    % ?PRINT(T1),
+    % ?PRINT(T2),
     Sub_ = unify(T1,T2),
+    % ?PRINT(Sub_),
     solve(
         % apply new substitution to remaining constraints
-        lists:map(fun(Cx) -> subC(Cx, Sub_) end, Cs), 
+        lists:map(fun(C) -> subC(C, Sub_) end, Cs), 
         % compose substitutions
-        comp(Sub_,Sub)).
+        comp(Sub_, Sub)).
 
 %%%%%%%%%%%% Unification algorithm
 
@@ -65,9 +72,10 @@ unifyMany([],_)             -> erlang:error({type_error, "arg_mismatch"});
 unifyMany(_,[])             -> erlang:error({type_error, "arg_mismatch"});
 unifyMany ([A|As],[B|Bs])   ->
     Sub = unify(A,B),
-    As_ = lists:map(fun(T) -> subT(T,Sub) end, As),
-    Bs_ = lists:map(fun(T) -> subT(T,Sub) end, Bs),
-    comp(unifyMany(As_,Bs_),Sub).
+    As_ = lists:map(fun(T) -> subT(T, Sub) end, As),
+    Bs_ = lists:map(fun(T) -> subT(T, Sub) end, Bs),
+    Sub_ = unifyMany(As_, Bs_),
+    comp(Sub_, Sub).
 
 % unify is left biased (this is a crucial property relied upon!)
 % i.e., unify(T1,T2) returns substitution for T1 in terms of T2
@@ -76,9 +84,11 @@ unify ({funt,L1,As1, B1}, {funt,L2,As2, B2}) ->
     try
         unifyMany (As1, As2)
     of
-        X -> 
-            Y = unify (subT(B1, X),subT(B2, X)),
-            comp(Y,X)
+        ArgsSub ->
+            B1_ = subT(B1, ArgsSub),
+            B2_ = subT(B2, ArgsSub),
+            RetSub = unify(B1_, B2_),
+            comp(RetSub, ArgsSub)
     catch
         error:{type_error,"arg_mismatch"} -> erlang:error({type_error, 
                                     "Number of arguments to function on line " ++ util:to_string(L1) ++ " do not match"
@@ -88,17 +98,17 @@ unify ({tvar,L,V},T) ->
     Eq  = eqType({tvar, L,V}, T),
     Occ = occurs(V,T),
     if
-        Eq              -> emptySub();
-        Occ             -> 
+        Eq -> emptySub();
+        Occ -> 
             erlang:error({type_error,
-                                "Failed occurs check on line " ++ util:to_string(L)});
-        true            -> maps:put(V,T,emptySub())
+                          "Failed occurs check on line " ++ util:to_string(L)});
+        true -> maps:put(V,T,emptySub())
     end;
 unify (T,{tvar,L,V}) ->
     unify ({tvar,L,V},T);
 unify({tcon,L1,N1,As1},{tcon,L2,N2,As2}) ->
     case N1 == N2 of
-        true        -> 
+        true ->
             try
                 unifyMany(As1,As2)
             catch   
@@ -106,16 +116,20 @@ unify({tcon,L1,N1,As1},{tcon,L2,N2,As2}) ->
                                     "Number of arguments to type constructor on line " ++ util:to_string(L1) ++ " do not match"
                                     ++ " arguments on line " ++ util:to_string(L2)})
             end;
-        false       -> erlang:error({type_error,
+        false -> erlang:error({type_error,
                         "Cannot unify "++ util:to_string(N1) 
                         ++ " (on line "++ util:to_string(L1) ++")"
                         ++" with " ++ util:to_string(N2) 
                         ++ " (on line "++ util:to_string(L2) ++")"})
     end;
 unify (T,U) ->
+    ?PRINT(T),
+    ?PRINT(U),
     Eq = eqType(T,U),
+    SubType = isSubTypes(T,U),
     if
         Eq          -> emptySub();
+        SubType     -> emptySub();
         true        -> erlang:error({type_error, 
                             "Cannot unify " ++ util:to_string(T) ++ 
                             " with " ++ util:to_string(U)})
@@ -129,6 +143,100 @@ eqType({funt,_,As1, B1}, {funt,_,As2, B2}) ->
 eqType({tcon,_,N1,As1},{tcon,_,N2,As2}) ->
     (N1 == N2) andalso util:eqLists(fun eqType/2,As1,As2);
 eqType(_,_) -> false.
+
+isSubTypes(T, {tcon, _, "Union", Ts}) -> lists:any(fun(X) -> eqType(T, X) end, Ts);
+isSubTypes(UT = {tcon, _, "Union", Ts}, T) -> isSubTypes(T, UT);
+isSubTypes(_, _) -> false.
+
+%%%%%%%%%%%% Unification Algorithm Modified For Union
+
+-spec solveWithUnion([constraint()]) -> sub().
+solveWithUnion(Cs) -> solveWithUnion(Cs, emptySub()).
+
+-spec solveWithUnion([constraint()], sub()) -> sub().
+solveWithUnion([], Sub) -> Sub; % empty constraints
+solveWithUnion([{T1,T2}|Cs],Sub) ->
+    % ?PRINT(Cs),
+    ?PRINT(T1),
+    ?PRINT(T2),
+    Sub_ = unifyWithUnion(T1,T2),
+    % ?PRINT(Sub_),
+    solveWithUnion(
+        % apply new substitution to remaining constraints
+        lists:map(fun(C) -> subC(C, Sub_) end, Cs), 
+        % compose substitutions
+        comp(Sub_, Sub)).
+
+-spec unifyManyUnion([type()],[type()]) -> {[type()],[type()], sub()}.
+unifyManyUnion([],[])            -> emptySub();
+unifyManyUnion([],_)             -> erlang:error({type_error, "arg_mismatch"});
+unifyManyUnion(_,[])             -> erlang:error({type_error, "arg_mismatch"});
+unifyManyUnion ([A|As],[B|Bs])   ->
+    Sub = unifyWithUnion(A,B),
+    As_ = lists:map(fun(T) -> subT(T, Sub) end, As),
+    Bs_ = lists:map(fun(T) -> subT(T, Sub) end, Bs),
+    Sub_ = unifyManyUnion(As_, Bs_),
+    comp(Sub_, Sub).
+
+% unify is left biased (this is a crucial property relied upon!)
+% i.e., unify(T1,T2) returns substitution for T1 in terms of T2
+-spec unifyWithUnion(type(), type()) -> {type(), type(), sub()}.
+unifyWithUnion ({funt,L1,As1, B1}, {funt,L2,As2, B2}) ->
+    try
+        unifyMany (As1, As2)
+    of
+        ArgsSub ->
+            B1_ = subT(B1, ArgsSub),
+            B2_ = subT(B2, ArgsSub),
+            {B1_U, B2_U, RetSub} = unifyWithUnion(B1_, B2_),
+            comp(RetSub, ArgsSub)
+    catch
+        error:{type_error,"arg_mismatch"} -> erlang:error({type_error, 
+                                    "Number of arguments to function on line " ++ util:to_string(L1) ++ " do not match"
+                                    ++ " arguments on line " ++ util:to_string(L2)})
+    end;
+unifyWithUnion (TVar = {tvar,L,V},T) ->
+    Eq  = eqType({tvar, L,V}, T),
+    Occ = occurs(V,T),
+    if
+        Eq -> {TVar, T, emptySub()};
+        Occ -> 
+            erlang:error({type_error,
+                          "Failed occurs check on line " ++ util:to_string(L)});
+        true -> {TVar, T, maps:put(V,T,emptySub())}
+    end;
+unifyWithUnion (T,{tvar,L,V}) ->
+    unify ({tvar,L,V},T);
+unifyWithUnion({tcon,L1,N1,As1},{tcon,L2,N2,As2}) ->
+    case N1 == N2 of
+        true ->
+            try
+                unifyManyUnion(As1, As2)
+            catch   
+                error:{type_error,"arg_mismatch"} -> erlang:error({type_error, 
+                                    "Number of arguments to type constructor on line " ++ util:to_string(L1) ++ " do not match"
+                                    ++ " arguments on line " ++ util:to_string(L2)})
+            end;
+        false -> erlang:error({type_error,
+                        "Cannot unify "++ util:to_string(N1) 
+                        ++ " (on line "++ util:to_string(L1) ++")"
+                        ++" with " ++ util:to_string(N2) 
+                        ++ " (on line "++ util:to_string(L2) ++")"})
+    end;
+unifyWithUnion (T, U) ->
+    ?PRINT(T),
+    ?PRINT(U),
+    Eq = eqType(T, U),
+    TFreshVar = fresh(getLn(T)),
+    UFreshVar = fresh(getLn(U)),
+    UnionType = hm:tcon("Union",[T, U], 0),
+    % [{T, UnionType}]
+    ?PRINT(UnionType),
+    if
+        Eq   -> {T, U, emptySub()};
+        true -> {TFreshVar, UFreshVar, #{TFreshVar => UnionType, UFreshVar => UnionType}}
+    end.
+
 
 %%%%%%%%%%%% Utilities
 
@@ -166,44 +274,46 @@ comp (X,Y) ->
             fun(_,Type) -> subT(Type,X) end, Y),
     maps:merge(X,Y_).   % union (Y_, entries in X whose keys are not in Y)
 
-% Apply a subtitution to a type
+% Apply a substitution to a type
 -spec subT(type(), sub()) -> type().
-subT ({tvar, L, X}, Sub)  ->
-    case maps:is_key(X,Sub) of
+subT ({tvar, L, X}, Sub) ->
+    case maps:is_key(X, Sub) of
         true    ->  maps:get(X,Sub);
         false   ->  {tvar, L, X}
     end;
 subT ({bt, L, T}, _)  ->
     {bt, L, T};
-subT ({funt, L, As, B}, Sub)   ->
+subT ({funt, L, As, B}, Sub) ->
+    % ?PRINT(As),
+    % ?PRINT(Sub),
     {funt, L, lists:map(fun(A) -> subT (A,Sub) end, As), subT(B,Sub)};
-subT ({tcon, L, N, As}, Sub)   ->
+subT ({tcon, L, N, As}, Sub) ->
     {tcon, L, N, lists:map(fun(A) -> subT (A,Sub) end, As)};
 subT ({forall, {tvar, L, X}, Ps, A}, Sub)   ->
-    case maps:is_key(X,Sub) of
-        true    ->  {forall, {tvar, L, X}, subPs(Ps,Sub) ,subT(A,maps:remove(X,Sub))};  % avoids name capture!
-        false   ->  {forall, {tvar, L, X}, subPs(Ps,Sub) ,subT(A,Sub)}
+    case maps:is_key(X, Sub) of
+        true  -> {forall, {tvar, L, X}, subPs(Ps, Sub), subT(A, maps:remove(X,Sub))};  % avoids name capture!
+        false -> {forall, {tvar, L, X}, subPs(Ps, Sub), subT(A, Sub)}
     end;
 subT ({whilst,Ps,T},Sub) -> {whilst,subPs(Ps,Sub),subT(T,Sub)};
 %% TODO VR : Fix how to support multiple definitions%%
 subT ([Type|_Rest], Sub) -> subT(Type, Sub).
 
 
-% Repetitive substution on a constraint
+% Repetitive substitution on a constraint
 -spec subC(constraint(), sub()) -> constraint().
-subC ({T1,T2},S) -> {subT(T1,S),subT(T2,S)}.
+subC ({T1, T2}, S) -> {subT(T1, S), subT(T2, S)}.
 
-% Repetitive substution on a predicate
+% Repetitive substitution on a predicate
 -spec subP(predicate(), sub()) -> predicate().
 subP ({class,C,T},S) -> {class,C,subT(T,S)};
 subP ({oc,T,MatcingTypes},S) -> 
     {oc, subT(T,S), lists:map(fun(MT)-> subT(MT,S) end, MatcingTypes)}.
 
-% Repetitive substution on a predicate
+% Repetitive substitution on a predicate
 -spec subPs([predicate()], sub()) -> predicate().
 subPs (Ps,S) -> lists:map(fun(P) -> subP(P,S) end, Ps).
 
-% Repetitive substution on an environment
+% Repetitive substitution on an environment
 -spec subE(env:env(), sub()) -> env:env().
 subE (Env,S) -> env:fmapV(fun(T) -> subT(T,S) end, Env).
 
@@ -359,6 +469,13 @@ prettify(Env, {tcon, _, N, As}) ->
             , fun() -> io:fwrite(",") end
             , Env, As),
             io:fwrite("}"),E;
+        "Union" ->
+            io:fwrite("("),
+            E = util:interFoldEffect(
+            fun(A,E) -> prettify(E,A) end
+            , fun() -> io:fwrite("|") end
+            , Env, As),
+            io:fwrite(")"),E;
         _       -> 
             io:fwrite("~s ", [N]),
             util:interFoldEffect(
@@ -412,7 +529,6 @@ prettyCs([{T1,T2}|Cs],S) ->
 %% check types are same irrespective of line number
 is_same({bt, _, T1}, {bt, _, T2}) -> T1 == T2;
 is_same({funt, _, T1As, T1B}, {funt, _, T2As, T2B}) -> 
-    % ?PRINT(T1As), ?PRINT(T2As),
     IsParamsMatch = case length(T1As) == length(T2As) of 
         true  -> is_same_types(T1As,T2As);
         false -> false
@@ -425,8 +541,13 @@ is_same({forall, _, P1s, A1},{forall, _, P2s, A2}) ->
 is_same(T1,{whilst,[],T2}) -> is_same(T1, T2);
 is_same({whilst,[],T1}, T2) -> is_same(T1, T2);
 is_same({whilst,P1s,A1},{whilst,P2s,A2}) -> is_same_predicates(P1s, P2s) and is_same(A1, A2);
-is_same(T1,T2) -> io:fwrite("Wrong types ~p : ~p ",[T1, T2]), false.
+is_same(_T1, _T2) -> false.
 
+is_same_error_msg(T1, T2) ->
+    case is_same(T1,T2) of
+        true -> true;
+        false -> pretty(T1), io:fwrite(" & "), pretty(T2), io:fwrite(" Wrong types "), false
+    end.
 %% helpers
 is_same_types(T1s,T2s)->
     not lists:member(false,
