@@ -9,7 +9,7 @@
         ,isGuardExprEnabled/1 %,addModuleBindings/2
         ,addExtModuleBindings/2,lookup_ext_binding/2
         ,printExtBindings/1, dumpModuleSpecs/2
-        ,readModuleSpecs/1, lookup_spec_binding/2]).
+        ,readModuleSpecs/1, lookup_spec_binding/2, addSpecs/2, getSpecs/1]).
 
 -export_type([env/0]).
 
@@ -22,7 +22,7 @@
 -record(ten, 
     {   bindings        = [],
         ext_bindings    = [],
-        specs_bindings  = [],
+        specs_env       = spec:empty(),
         constructors    = [],
         recFieldMap     = [],
         guardExpr       = [],
@@ -55,6 +55,12 @@ is_bound(X,Env) -> proplists:is_defined(X,Env#ten.bindings).
 extend(X,A,Env) -> Env#ten{bindings = [{X,A} | Env#ten.bindings]}.
 
 addGuard(X,A,Env) -> Env#ten{guardExpr = [{X,A} | Env#ten.guardExpr]}.
+
+%% Add the user defined specs to the env.
+addSpecs(Env, Specs) -> Env#ten{specs_env = Specs}.
+
+%% Add the user defined specs to the env.
+getSpecs(Env) -> Env#ten.specs_env.
 
 checkGuard(X,Env) -> proplists:get_value(X, Env#ten.guardExpr).
 

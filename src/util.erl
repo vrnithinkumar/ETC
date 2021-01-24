@@ -33,7 +33,7 @@ getFnArgLen (Fun) -> element(4,Fun).
 getFnClauses (Fun) -> element(5,Fun).
 getLn(Node) -> element(2,Node).
 
-getFnQName(Fun) -> {getFnName(Fun),getFnArgLen(Fun)}.
+getFnQName(Fun) -> {getFnName(Fun), getFnArgLen(Fun)}.
 
 eqLists(Comp,Xs,Ys) ->
     (length(Xs) == length (Ys))

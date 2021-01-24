@@ -61,18 +61,19 @@ parse_transform(Forms,_) ->
     % Get specs
     Specs = pp:getSpecs(Forms),
     Spec = getSpecWithAllFuns(Specs),
+    EnvWithSpecs = env:addSpecs(env:default(), Spec),
     % add UDTs to default env
     UDTs = pp:getUDTs(Forms),
-    Env0 = lists:foldl(fun(UDT,AccEnv) -> 
+    Env0 = lists:foldl(fun(UDT,AccEnv) ->
         addUDTNode(UDT,AccEnv) 
-    end, env:default(), UDTs),
+    end, EnvWithSpecs, UDTs),
     % add all user defined records
-    Env1 = lists:foldl(fun(Rec,AccEnv) -> 
+    Env1 = lists:foldl(fun(Rec,AccEnv) ->
         addRec(Rec,AccEnv) 
     end, Env0, pp:getRecs(Forms)),
     % add all depend external module functions
-    Env = lists:foldl(fun(Mod, AccEnv) -> 
-        env:addExtModuleBindings(AccEnv,Mod)
+    Env = lists:foldl(fun(Mod, AccEnv) ->
+        env:addExtModuleBindings(AccEnv, Mod)
     end, Env1, Mods),
     % get all functions
     Functions = pp:getFns(Forms),
@@ -81,11 +82,11 @@ parse_transform(Forms,_) ->
     % type check each SCC and extend Env
     try
         lists:foldl(fun(SCC, AccEnv) ->
-               typeCheckSCC(SCC,AccEnv)
+            typeCheckSCC(SCC, AccEnv)
         end, Env, SCCs)
     of  
         Env_ -> 
-            env:dumpModuleBindings(Env_,Module),
+            env:dumpModuleBindings(Env_, Module),
             io:fwrite("Module ~p: ~n",[Module]), 
             lists:map(fun({X,T}) -> 
                 checkWithSpec(Spec, X, T),
@@ -108,7 +109,7 @@ parse_transform_stdlib(Forms) ->
     Specs = pp:getSpecs(Forms),
     SpecTypes = getSpecWithAllFuns(Specs),
     % add UDTs to default env
-    env:dumpModuleSpecs(SpecTypes,Module),
+    env:dumpModuleSpecs(SpecTypes, Module),
     io:fwrite("Library Module:- ~p ~n",[Module]), 
     lists:map(fun({X,T}) -> 
         io:fwrite("  ~p :: ",[X]),
@@ -119,30 +120,34 @@ parse_transform_stdlib(Forms) ->
     io:fwrite("~n",[]),
     pp:eraseAnn(Forms).
 
-typeCheckSCC(Functions,Env) ->
+typeCheckSCC(Functions, Env) ->
     % assign a fresh type variable to every function
     FreshEnv = lists:foldl(fun(F,AccEnv) -> 
         FunQName = util:getFnQName(F), 
         env:extend(FunQName, hm:fresh(util:getLn(F)), AccEnv)
     end, Env, Functions),
-    % ?PRINT(FreshEnv),
-    {InfCs,InfPs} = lists:foldl(fun(F,{AccCs,AccPs}) ->
-        FunQName = util:getFnQName(F),
-        {T,Cs,Ps} = infer(FreshEnv,F),
-        % ?PRINT(T),
-        % ?PRINT(Cs),
-        % ?PRINT(Ps),
-        {FreshT,_} = lookup(FunQName, FreshEnv, util:getLn(F)),
-        { unify(T, FreshT) ++ Cs ++ AccCs
-        , Ps ++ AccPs}
+    {InfCs,InfPs} = lists:foldl(fun(F, AccCsPs) ->
+        inferOrCheck(FreshEnv, F, AccCsPs)
     end, {[],[]}, Functions),
+
+    %% Add all specs to Env
+    EnvWithSpec = lists:foldl(fun(F, AccEnv) ->
+        FunQName = util:getFnQName(F),
+        Specs = env:getSpecs(Env),
+        case hasUserSpecifiedSpec(Specs, FunQName) of
+            true -> 
+                FT = getFirstSpecType(Specs, FunQName),
+                env:extend(FunQName, FT, AccEnv);
+            false -> AccEnv
+        end
+    end, FreshEnv, Functions),
     % Solve unification constraints
     Sub             = hm:solve(InfCs),
     Ps              = hm:subPs(InfPs,Sub),
     % predicate solving leads in a substitution since 
     % oc predicates are basically ambiguous unification constraints
     {Sub_, RemPs}   = hm:solvePreds(rt:defaultClasses(), Ps),
-    SubdEnv = hm:subE(FreshEnv,hm:comp(Sub_,Sub)), 
+    SubdEnv = hm:subE(EnvWithSpec, hm:comp(Sub_,Sub)), 
     lists:foldl(fun(F, AccEnv) ->
         FunQName = util:getFnQName(F),
         %lookup type from the substituted environment
@@ -151,7 +156,19 @@ typeCheckSCC(Functions,Env) ->
         PolyT   = hm:generalize(T, AccEnv, RemPs),
         env:extend(FunQName, PolyT, AccEnv)
     end, Env, Functions).
-    
+
+
+inferOrCheck(Env, F, {AccCs, AccPs}) ->
+    FunQName = util:getFnQName(F),
+    Specs = env:getSpecs(Env),
+    case hasUserSpecifiedSpec(Specs, FunQName) of
+        false -> 
+            {T,Cs,Ps} = infer(Env,F),
+            {FreshT,_} = lookup(FunQName, Env, util:getLn(F)),
+            { unify(T, FreshT) ++ Cs ++ AccCs
+            , Ps ++ AccPs};
+        true -> {AccCs, AccPs}
+    end.
 
 -spec infer(hm:env(), erl_syntax:syntaxTree()) -> 
     {hm:type(),[hm:constraint()],[hm:predicate()]}.
@@ -857,7 +874,7 @@ specToType({QFName, Types}) ->
 
 checkWithSpec(Spec, X, T) ->
     SpecTs = spec:lookup(X, Spec),
-    case SpecTs of 
+    case SpecTs of
         undefined -> [];
          _ ->
         Lines = lists:map(fun(ST) -> hm:getLn(ST) end, SpecTs),
@@ -869,7 +886,11 @@ checkWithSpec(Spec, X, T) ->
     end.
 
 hasUserSpecifiedSpec(Spec, X) ->
-    case spec:lookup(X, Spec) of 
+    case spec:lookup(X, Spec) of
         undefined -> false;
         _         -> true
     end.
+
+getFirstSpecType(Spec, X) ->
+    SpecTs = spec:lookup(X, Spec),
+    hd(SpecTs).

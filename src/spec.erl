@@ -27,10 +27,7 @@
 empty() -> #specenv{}.
 
 parse_transform(Forms,_Opt) ->
-    % Pid = self(),
-    % ?PRINT(Pid),
     Mods_ = pp:getImprtdMods(Forms),
-    % ?PRINT(Mods_),
     pp:eraseAnn(Forms).
 
 extend(X,A,Spec) -> Spec#specenv{functions = [{X,A} | Spec#specenv.functions]}.
@@ -39,4 +36,4 @@ add_functions(Fs,Spec) -> Spec#specenv{functions = Fs}.
 
 get_spec_functions(Spec) -> Spec#specenv.functions.
 
-lookup(X, Spec) -> proplists:get_value(X, Spec#specenv.functions).
+lookup(X, Spec) -> proplists:get_value(X, get_spec_functions(Spec)).
