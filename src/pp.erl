@@ -7,7 +7,7 @@ eraseAnn(Forms) ->
     lists:filter(fun(F) ->
         case F of
             {attribute,_,etc,_}    -> false;
-            _                           -> true
+            _                      -> true
         end
     end, Forms).
 
