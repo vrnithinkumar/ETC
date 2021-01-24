@@ -855,10 +855,8 @@ getSpecWithAllFuns(Specs) ->
 specToType({QFName, Types}) ->
     {QFName, lists:map(fun node2type/1, Types)}.
 
-checkWithSpec(Spec, X, T) -> 
+checkWithSpec(Spec, X, T) ->
     SpecTs = spec:lookup(X, Spec),
-    % ?PRINT(SpecTs),
-    % ?PRINT(T),
     case SpecTs of 
         undefined -> [];
          _ ->
@@ -868,4 +866,10 @@ checkWithSpec(Spec, X, T) ->
             true  -> io:fwrite("Same as type spec defined in lines ~p ~n", [Lines]);
             false -> io:fwrite("Different from type defined in lines ~p ~n", [Lines])
         end
+    end.
+
+hasUserSpecifiedSpec(Spec, X) ->
+    case spec:lookup(X, Spec) of 
+        undefined -> false;
+        _         -> true
     end.
