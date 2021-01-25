@@ -134,9 +134,9 @@ typeCheckSCC(Functions, Env) ->
     EnvWithSpec = lists:foldl(fun(F, AccEnv) ->
         FunQName = util:getFnQName(F),
         Specs = env:getSpecs(Env),
-        case hasUserSpecifiedSpec(Specs, FunQName) of
+        case spec:hasUserSpecifiedSpec(Specs, FunQName) of
             true -> 
-                FT = getFirstSpecType(Specs, FunQName),
+                FT = spec:getFirstSpecType(Specs, FunQName),
                 env:extend(FunQName, FT, AccEnv);
             false -> AccEnv
         end
@@ -157,17 +157,18 @@ typeCheckSCC(Functions, Env) ->
         env:extend(FunQName, PolyT, AccEnv)
     end, Env, Functions).
 
-
 inferOrCheck(Env, F, {AccCs, AccPs}) ->
     FunQName = util:getFnQName(F),
     Specs = env:getSpecs(Env),
-    case hasUserSpecifiedSpec(Specs, FunQName) of
+    case spec:hasUserSpecifiedSpec(Specs, FunQName) of
         false -> 
             {T,Cs,Ps} = infer(Env,F),
             {FreshT,_} = lookup(FunQName, Env, util:getLn(F)),
             { unify(T, FreshT) ++ Cs ++ AccCs
             , Ps ++ AccPs};
-        true -> {AccCs, AccPs}
+        true -> 
+            tc:type_check(Env, F),
+            {AccCs, AccPs}
     end.
 
 -spec infer(hm:env(), erl_syntax:syntaxTree()) -> 
@@ -880,17 +881,7 @@ checkWithSpec(Spec, X, T) ->
         Lines = lists:map(fun(ST) -> hm:getLn(ST) end, SpecTs),
         Same = not lists:member(false, lists:map(fun(ST) -> hm:is_same(ST, T) end, SpecTs)),
         case Same of
-            true  -> io:fwrite("Same as type spec defined in lines ~p ~n", [Lines]);
-            false -> io:fwrite("Different from type defined in lines ~p ~n", [Lines])
+            true  -> io:fwrite("Same as type spec defined in lines ~p ~n", [[Lines]]);
+            false -> io:fwrite("Different from type defined in lines ~p ~n", [[Lines]])
         end
     end.
-
-hasUserSpecifiedSpec(Spec, X) ->
-    case spec:lookup(X, Spec) of
-        undefined -> false;
-        _         -> true
-    end.
-
-getFirstSpecType(Spec, X) ->
-    SpecTs = spec:lookup(X, Spec),
-    hd(SpecTs).
