@@ -13,8 +13,12 @@ type_check(Env, F) ->
     case spec:hasUserSpecifiedSpec(Specs, FunQName) of
         true -> 
             SpecFT = spec:getFirstSpecType(Specs, FunQName),
-            ?PRINT(FunQName),
-            ?PRINT(SpecFT),
-            true;
+            do_infer_type_check(Env, F, SpecFT);
         false -> false
     end.
+
+do_infer_type_check(Env, F, SpecFT) ->
+    FunQName = util:getFnQName(F),
+    ?PRINT(FunQName),
+    ?PRINT(SpecFT),
+    true.
