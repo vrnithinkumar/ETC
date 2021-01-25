@@ -36,3 +36,7 @@ Then just call your plugin directly in an existing application:
     ===> Fetching etc_plug
     ===> Compiling etc_plug
     <Plugin Output>
+
+Update the plugin:
+
+    rebar3 plugins upgrade etc_plug
