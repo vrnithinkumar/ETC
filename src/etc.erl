@@ -878,10 +878,10 @@ checkWithSpec(Spec, X, T) ->
     case SpecTs of
         undefined -> [];
          _ ->
-        Lines = lists:map(fun(ST) -> hm:getLn(ST) end, SpecTs),
+        Lines = lists:map(fun(ST) -> integer_to_list(hm:getLn(ST)) end, SpecTs),
         Same = not lists:member(false, lists:map(fun(ST) -> hm:is_same(ST, T) end, SpecTs)),
         case Same of
-            true  -> io:fwrite("Same as type spec defined in lines ~p ~n", [[Lines]]);
-            false -> io:fwrite("Different from type defined in lines ~p ~n", [[Lines]])
+            true  -> io:fwrite("Same as type spec defined in lines ~p ~n", [Lines]);
+            false -> io:fwrite("Different from type defined in lines ~p ~n", [Lines])
         end
     end.
