@@ -208,7 +208,7 @@ infer(Env,{call,L,{atom,_,is_function},[F,{integer,_,Arity}]}) ->
 infer(Env,{call,L,{atom,_,element},[{integer,_,N},{tuple,_,Es}]}) ->
     case N =< length(Es) of
         false -> erlang:error({type_error,
-            "Index to element must be atleast the length of the tuple on " ++ util:to_string(L)});
+            "Index to element must be at least the length of the tuple on " ++ util:to_string(L)});
         true -> 
             {Ts,Cs,Ps} = lists:foldl(
                         fun(X, {AccT,AccCs,AccPs}) -> 
