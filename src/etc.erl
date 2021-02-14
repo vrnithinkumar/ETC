@@ -13,7 +13,7 @@
 -define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
 -endif.
 
--export([parse_transform/2]).
+-export([parse_transform/2, lookup/3, infer/2]).
 
 -export([main/1]).
 
@@ -626,13 +626,13 @@ lookup(X,Env,L) ->
         true  -> 
             case env:checkGuard(X,Env) of
                 undefined   ->
-                    lookup_(X,Env,L);
+                    lookup_(X, Env, L);
                     % non supported guard will be a compiler error
                     % ,erlang:error({type_error,util:to_string(X) ++ 
                     %     " unsupported guard on line " ++ util:to_string(L)});
                 T           ->
-                    {FT,Ps} = hm:freshen(T),
-                    {hm:replaceLn(FT,0,L),Ps}
+                    {FT, Ps} = hm:freshen(T),
+                    {hm:replaceLn(FT, 0, L), Ps}
             end
     end.
 
@@ -654,7 +654,7 @@ lookup_(X,Env,L) ->
     end.
 
 lookupRemote(X,Env,L,Module) ->
-    case env:lookupRemote(Module,X,Env) of
+    case env:lookupRemote(Module, X, Env) of
         undefined   ->
              erlang:error({type_error,util:to_string(X) ++ 
                             " on line " ++ util:to_string(L) ++ 
