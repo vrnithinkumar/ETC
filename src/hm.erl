@@ -9,6 +9,7 @@
 -export([freshen/1,generalize/3,eqType/2,fresh/1]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/3]).
 -export([is_same/2]).
+-export([get_fn_args/1, get_fn_rt/1]).
 -export_type([constraint/0,type/0]).
 
 
@@ -435,3 +436,9 @@ is_same_types(T1s,T2s)->
 is_same_predicates(P1s,P2s)->
     not lists:member(false, 
             lists:map(fun({P1, P2}) -> P1==P2 end, lists:zip(P1s,P2s))).
+
+%% Type Check Helpers
+get_fn_args({funt, _, Args, _}) ->
+    Args.
+get_fn_rt({funt, _, _, Ret}) ->
+    Ret.
