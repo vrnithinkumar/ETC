@@ -1,0 +1,5 @@
+Module simple_return: 
+Same as type spec defined in lines ["3"] 
+  {foo,1} :: (integer)->boolean
+
+test_cases/simple_return.erl:4: Warning: function foo/1 is unused
