@@ -1,0 +1,6 @@
+Module case_branch_use: 
+  {foo,1} :: [Num A;].(atom)->float
+  {ping,0} :: ()->float
+  {pong,0} :: [Num A;].()->A
+
+test_cases/case_branch_use.erl:2: Warning: export_all flag enabled - all functions will be exported
