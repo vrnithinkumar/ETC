@@ -18,6 +18,5 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Compile
-      run: rebar3 compile
-    - name: Run Tests
-      run: cd ./testsuit ; sh ./run.sh
+      run: rebar3 escriptize
+
