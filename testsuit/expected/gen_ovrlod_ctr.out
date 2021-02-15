@@ -1,0 +1,15 @@
+Module gen_ovrlod_ctr: 
+  {app_get_rights,0} :: either [char] float :~: {either [char] float} ()->[float]
+  {bind,2} :: A :~: {dir B || either C B} A :~: {dir D || either D E} F :~: {dir D || either D G} (A,(B)->F)->F
+  {extract,1} :: A :~: {dir B || either B C} A :~: {dir B || either D B} (A)->B
+  {fmap,2} :: A :~: {dir B || either B C} D :~: {dir B || either B E} A :~: {dir F || either G F} D :~: {dir H || either I H} ((F)->H,A)->D
+  {foo,0} :: [Num A;].[Num B;].()->C
+  {foo1,0} :: A :~: {dir boolean || either boolean B} A :~: {dir boolean || either C boolean} A :~: {dir boolean || either boolean D} ()->boolean
+  {get_rights,1} :: A :~: {dir B || either C B} A :~: {dir D || either D E} ([A])->[B]
+  {is_left,1} :: A :~: {dir B || either B C} (A)->boolean
+  {is_right,1} :: A :~: {dir B || either C B} (A)->boolean
+  {safe_div,2} :: either [char] integer :~: {either [char] integer} (integer,integer)->either [char] integer
+
+test_cases/gen_ovrlod_ctr.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/gen_ovrlod_ctr.erl:6: Warning: type either(_,_) is unused
+test_cases/gen_ovrlod_ctr.erl:7: Warning: type dir(_) is unused
