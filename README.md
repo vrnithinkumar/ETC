@@ -22,7 +22,12 @@ Build And Use
 
     # (only) partial evaluation example
     ./etc +pe +noti -P hello_pe.erl
-    
+
+Run Tests
+-----
+    cd ./testsuits
+    bash run.sh
+
 Using With Rebar3
 -----
 
