@@ -1,7 +1,9 @@
 etc
 =====
 
+
 Erlang Type Checker
+Based on [Nachi](https://github.com/nachivpn)'s [ETC](https://github.com/nachivpn/mt)
 
 Build And Use
 -----
