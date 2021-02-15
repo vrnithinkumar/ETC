@@ -12,7 +12,6 @@ Module erlangy_arithmatic:
   {foo3,0} :: ()->float
   {foo4,0} :: ()->float
   {foo5,2} :: (integer,integer)->integer
-  {foo6,0} :: [Num A;].[Num B;].()->B
   {getFloat,0} :: ()->float
   {getInt,0} :: [Num A;].()->A
 

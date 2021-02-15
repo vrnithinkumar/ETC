@@ -38,7 +38,7 @@ divTest() ->
 foo5(X,Y) -> add(X,Y) div X.
 
 % use integer with num operator 
-foo6() -> X = 6, add(X, X).
+% foo6() -> X = 6, add(X, X).
 
 bar(Y) -> Y + 1.
 
