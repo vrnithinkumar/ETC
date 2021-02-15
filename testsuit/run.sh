@@ -33,5 +33,10 @@ do
 done
 echo "-------------"
 echo
-echo "Total: $NoTotal Passed: $NoPassed Failed: $NoFailed"
+echo "Summary"
+echo "======="
+echo "Total : $NoTotal"
+echo "Passed: $NoPassed"
+echo "Failed: $NoFailed"
+echo
 echo "test suit exited!"
