@@ -16,7 +16,7 @@ echo "-------------"
 for case in test_cases/*.erl
 do
     NoTotal=$((NoTotal+1))
-    ExpectedCase=${case//erl/out}
+    ExpectedCase=${case//.erl/.out}
     ExpectedCase=${ExpectedCase//test_cases/expected}
     Result=$(../etc $case)
     Expected=$(cat $ExpectedCase)
@@ -24,8 +24,8 @@ do
         echo "Test: $case: PASSED"
         NoPassed=$((NoPassed+1))
     else
-        #echo $Result
-        #echo $Expected
+        # echo $Result
+        # echo $Expected
         NoFailed=$(($NoFailed+1))
         echo "Test: $case : FAILED"
         diff <(echo $Result) <(echo $Expected)
