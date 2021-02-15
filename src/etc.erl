@@ -87,13 +87,14 @@ parse_transform(Forms,_) ->
     of  
         Env_ -> 
             env:dumpModuleBindings(Env_, Module),
-            io:fwrite("Module ~p: ~n",[Module]), 
+            io:fwrite("Module ~p: ~n",[Module]),
+            SortedBinds = lists:sort(env:readModuleBindings(Module)),
             lists:map(fun({X,T}) -> 
                 checkWithSpec(Spec, X, T),
                 io:fwrite("  ~p :: ",[X]), 
                 hm:pretty(T), 
                 io:fwrite("~n",[])
-            end, env:readModuleBindings(Module)),
+            end, SortedBinds),
             io:fwrite("~n",[])
     catch
         error:{type_error,Reason} -> erlang:error("Type Error: " ++ Reason)

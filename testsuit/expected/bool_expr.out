@@ -1,0 +1,12 @@
+Module bool_expr: 
+  {beand,2} :: (boolean,boolean)->boolean
+  {beandalso,2} :: (boolean,boolean)->boolean
+  {beor,2} :: (boolean,boolean)->boolean
+  {beorelse,2} :: (boolean,boolean)->boolean
+  {bexor,2} :: (boolean,boolean)->boolean
+
+test_cases/bool_expr.erl:6: Warning: function beand/2 is unused
+test_cases/bool_expr.erl:8: Warning: function beor/2 is unused
+test_cases/bool_expr.erl:10: Warning: function bexor/2 is unused
+test_cases/bool_expr.erl:12: Warning: function beorelse/2 is unused
+test_cases/bool_expr.erl:14: Warning: function beandalso/2 is unused
