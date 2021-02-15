@@ -1,0 +1,7 @@
+Module ping_pong: 
+  {pingClient,1} :: [Padd A;].(A)->[char]
+  {pongServer,0} :: ()->A
+  {start,0} :: ()->atom
+
+test_cases/ping_pong.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/ping_pong.erl:4: Warning: type protocol() is unused
