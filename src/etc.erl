@@ -13,7 +13,7 @@
 -define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
 -endif.
 
--export([parse_transform/2, lookup/3, infer/2]).
+-export([parse_transform/2, lookup/3, infer/2, checkExpr/2]).
 
 -export([main/1]).
 
