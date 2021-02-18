@@ -360,6 +360,13 @@ prettify(Env, {tcon, _, N, As}) ->
             , fun() -> io:fwrite(",") end
             , Env, As),
             io:fwrite("}"),E;
+        "Union" ->
+            io:fwrite("("),
+            E = util:interFoldEffect(
+            fun(A,E) -> prettify(E,A) end
+            , fun() -> io:fwrite("|") end
+            , Env, As),
+            io:fwrite(")"),E;
         _       -> 
             io:fwrite("~s ", [N]),
             util:interFoldEffect(

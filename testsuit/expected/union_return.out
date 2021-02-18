@@ -1,5 +1,5 @@
 Module union_return: 
 Same as type spec defined in lines ["3"] 
-  {foo,2} :: (integer,boolean)->Union integer boolean
+  {foo,2} :: (integer,boolean)->(integer|boolean)
 
 test_cases/union_return.erl:4: Warning: function foo/2 is unused
