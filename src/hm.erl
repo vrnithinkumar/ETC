@@ -124,6 +124,9 @@ unify (T,U) ->
 
 -spec eqType(type(),type()) -> boolean().
 eqType({bt,_,A}, {bt,_,B}) -> A == B;
+% hack for string to char[] check
+eqType({bt,_,string}, {tcon,_, "List", [{bt, _, char}]}) -> true;
+eqType({tcon,_, "List", [{bt, _, char}]}, {bt,_,string}) -> true;
 eqType({tvar,_,X}, {tvar,_,Y}) -> X == Y;
 eqType({funt,_,As1, B1}, {funt,_,As2, B2}) ->
     eqType(B1,B2) andalso util:eqLists(fun eqType/2,As1,As2);

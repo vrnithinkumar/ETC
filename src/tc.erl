@@ -30,24 +30,25 @@ do_infer_type_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
     {Env, Result, Type} = check(Env, F, SpecFT),
     case Result of
-        false -> erlang:error({type_error,"Check failed for the function:: " ++ util:to_string(FunQName)});
-    true -> true
+        false -> erlang:error({type_error
+                               , "Check failed for the function:: " ++ util:to_string(FunQName)});
+        true  -> true
     end.
 
 -spec check(hm:env(), erl_syntax:syntaxTree(), hm:type()) ->
     {hm:env(), boolean(), hm:type()}.
 check(Env, {integer,L,_}, Type) ->
-    Inferred = hm:bt(integer,L),
+    Inferred = hm:bt(integer, L),
     IsSame = hm:isSubType(Inferred, Type),
     {Env, IsSame, Inferred};
-check(Env, {string,L,_}, Type) ->
+check(Env, {string, L,_}, Type) ->
     Inferred = hm:tcon("List", [hm:bt(char,L)],L),
     IsSame = hm:isSubType(Inferred, Type),
     {Env, IsSame, Inferred};
-check(_,{char,L,_}, Type) ->
+check(Env, {char,L,_}, Type) ->
     Inferred = hm:bt(char,L),
     IsSame = hm:isSubType(Inferred, Type),
-    {IsSame, Inferred};
+    {Env, IsSame, Inferred};
 check(Env, {float,L,_}, Type) ->
     Inferred = hm:bt(float, L),
     IsSame = hm:isSubType(Inferred, Type),
@@ -139,14 +140,14 @@ checkArgType(Env, ArgPattern, ArgType) ->
 % given a body of a clause, returns its type
 -spec checkClauseBody(hm:env(), erl_syntax:syntaxTree(), hm:types()) -> 
     {hm:env(), boolean(), hm:types()}.
-checkClauseBody(Env, Body, Type) ->
+checkClauseBody(Env, BodyExprs, Type) ->
     {Env_, CsBody, PsBody} = lists:foldl(
         fun(Expr, {Ei,Csi,Psi}) -> 
             {Ei_,Csi_,Psi_} = etc:checkExpr(Ei,Expr),
             {Ei_, Csi ++ Csi_, Psi ++ Psi_}
-        end, {Env,[],[]}, lists:droplast(Body)),
+        end, {Env,[],[]}, lists:droplast(BodyExprs)),
     SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
-    check(SolvedEnv, lists:last(Body), Type).
+    check(SolvedEnv, lists:last(BodyExprs), Type).
 
 -spec localConstraintSolver(hm:env(), [hm:constraint()], [hm:predicate()]) ->
     hm:env().
