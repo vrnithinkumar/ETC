@@ -7,7 +7,7 @@
     ,isTVar/1]).
 -export([bt/2,funt/3,tvar/2,tcon/3,forall/4]).
 -export([freshen/1,generalize/3,eqType/2,fresh/1]).
--export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/3]).
+-export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
 -export([is_same/2, isSubType/2]).
 -export([get_fn_args/1, get_fn_rt/1]).
 -export_type([constraint/0,type/0]).
@@ -156,6 +156,11 @@ replaceLn ({tvar, L0, X},L0,L1)       -> {tvar, L1, X};
 replaceLn ({tcon, L0, N, Args},L0,L1)    -> 
     {tcon, L1, N, lists:map(fun(A) -> replaceLn(A,L0,L1) end, Args)};
 replaceLn (T,_,_)                    -> T.
+
+-spec replaceLn(type(),integer()) -> type().
+replaceLn(Type, NewLn) ->
+    OldLn = getLn(Type),
+    replaceLn(Type, OldLn, NewLn).
 
 -spec fresh(integer()) -> type().
 fresh(L) -> tvar(make_ref(),L).

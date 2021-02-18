@@ -63,10 +63,18 @@ check(Env, {atom,L,X}, Type) ->
 check(Env, {var, L, '_'}, Type) ->
     {Env, true, Type};
 check(Env, {var, L, X}, Type) ->
-    {VarT, _Ps} = etc:lookup(X, Env, L),
-    IsSame = hm:isSubType(VarT, Type),
-    {Env, IsSame, VarT};
+    case env:is_bound(X,Env) of
+        true  ->
+            {VarT, _Ps} = etc:lookup(X, Env, L),
+            IsSame = hm:isSubType(VarT, Type),
+            {Env, IsSame, VarT};
+        false -> 
+            VarT = hm:replaceLn(Type, L),
+            Env_ = env:extend(X, VarT, Env),
+            {Env_, true, VarT}
+    end;
 check(Env,{match, L, _LNode, _RNode} = Node, Type) ->
+    ?PRINT(Node),
     {ResType, InfCs, InfPs} = etc:infer(Env, Node),
     % Solve unification constraints
     Sub = hm:solve(InfCs),
