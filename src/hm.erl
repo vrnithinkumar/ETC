@@ -6,7 +6,7 @@
     ,subPs/2,free/1
     ,isTVar/1]).
 -export([bt/2,funt/3,tvar/2,tcon/3,forall/4]).
--export([freshen/1,generalize/3,eqType/2,fresh/1]).
+-export([freshen/1,generalize/3,eqType/2,fresh/1, specialize/2]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
 -export([is_same/2, isSubType/2]).
 -export([get_fn_args/1, get_fn_rt/1]).
@@ -137,8 +137,8 @@ eqType(_,_) -> false.
 %%%%%%%%%%%% Utilities
 
 -spec isTVar(type()) -> boolean().
-isTVar({tvar, L, _})    -> true;
-isTVar(_)               -> false.
+isTVar({tvar, _L, _}) -> true;
+isTVar(_)             -> false.
 
 -spec getLn(type()) -> integer().
 getLn ({bt, L, _})          -> L;
@@ -171,11 +171,11 @@ emptySub () -> maps:new().
 % Compose two substitutions
 -spec comp(sub(), sub()) -> sub().
 comp (X,Y) ->
-    Y_ = maps:map( % apply subtitution X on every entry in Y
+    Y_ = maps:map( % apply substitution X on every entry in Y
             fun(_,Type) -> subT(Type,X) end, Y),
     maps:merge(X,Y_).   % union (Y_, entries in X whose keys are not in Y)
 
-% Apply a subtitution to a type
+% Apply a substitution to a type
 -spec subT(type(), sub()) -> type().
 subT ({tvar, L, X}, Sub)  ->
     case maps:is_key(X,Sub) of
@@ -321,6 +321,65 @@ getUniPreds(Ps) ->
 -spec solvePreds([predicate()],[predicate()]) -> {sub(),[predicate()]}.
 solvePreds(Premise,Ps) -> ps:psMain(Premise,Ps).
 
+-spec bound_constraints(type()) -> [{tvar(), [predicate()]}].
+bound_constraints({forall, {tvar,_, X}, C, A}) ->
+    [{X, C} | bound_constraints(A)];
+bound_constraints(_) -> [].
+
+-spec specialize(type(), [hm:type()]) -> {hm:type()}.
+specialize(T, STs) ->
+    BoundVars = bound_constraints(T),
+    CanSpec = can_specialize(BoundVars, STs),
+    {StrippedT, Ps} = stripbound(T),
+    case CanSpec of
+        true -> 
+            RT = replace_with_type(T, STs),
+            ?PRINT(RT),
+            RT;
+        false -> erlang:error({type_error,
+        "Cannot specialize "++ pretty(T)})
+    end.
+
+replace_with_type(T, Ts) ->
+    BoundVars = lists:map(fun({TVar, _}) -> TVar end, bound(T)),
+    Mix = lists:zip(BoundVars, Ts),
+    Sub = lists:foldr(
+        fun({TVar, Concrete}, SAcc)->
+        comp(SAcc, maps:put(TVar, Concrete, emptySub()))
+        end, emptySub(), Mix),
+    {StrippedT, _Ps} = stripbound(T),
+    subT(StrippedT, Sub).
+
+-spec can_specialize([{tvar(), [predicate()]}], [hm:type()]) -> boolean().
+can_specialize([], []) -> true;
+can_specialize([{_TVar, Ps}| Rest], [T| Ts]) ->
+    FirstMatch = class_preds_sats(Ps, T),
+    RestMatch = can_specialize(Rest, Ts),
+    FirstMatch and RestMatch.
+
+class_preds_sats([], T) -> true;
+class_preds_sats([{class, Class, _} | Rest], T) ->
+    FirstMatch = is_matching_class(Class, T),
+    RestOfMatch = class_preds_sats(Rest, T),
+    FirstMatch and RestOfMatch.
+
+is_matching_class(Class, Type) ->
+    Members = get_all_class_types(rt:defaultClasses(), Class),
+    has_matching(Members, Type).
+
+has_matching([], Type) -> false;
+has_matching([H| Tail], Type) ->
+    case eqType(H, Type) of
+        true -> true;
+        false -> has_matching(Tail, Type)
+    end.
+
+get_all_class_types([], Class) -> [];
+get_all_class_types([H| Tail], Class) ->
+    case H of 
+        {class, Class, T} -> [T | get_all_class_types(Tail, Class)];
+        _                 -> get_all_class_types(Tail, Class)
+    end.
 %%%%%%%%%%%%%%%%%%%%
 %% Pretty printing
 %%%%%%%%%%%%%%%%%%%%
@@ -381,8 +440,7 @@ prettify(Env, {tcon, _, N, As}) ->
             fun(A,E) -> prettify(E,A) end
             , fun() -> io:fwrite(" ") end
             , Env, As)
-    end
-;
+    end;
 prettify(Env,{forall, _, Ps, A}) ->
     case Ps of
         [] -> prettify(Env, A);
