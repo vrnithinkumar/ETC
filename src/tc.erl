@@ -86,11 +86,12 @@ check(Env,{match, L, _LNode, _RNode} = Node, Type) ->
     {VarT, _Ps} = etc:lookup('X', SubdEnv, L),
     ?PRINT(VarT),
     {SubdEnv, true, Type};
-check(Env,{ op, L, Op, E1, E2}, Type) ->
-    {OpType, _Ps} = etc:lookup(Op, Env, L),
+check(Env, {op, L, Op, E1, E2}, Type) ->
+    OpType = lookup(Op, Env, L),
     Arg1Type = hd(hm:get_fn_args(OpType)),
     Arg2Type = lists:last(hm:get_fn_args(OpType)),
     RetType = hm:get_fn_rt(OpType),
+    SpecType = hm:specialize(OpType, [Arg1Type, Arg2Type]),
     {Env1, Res1, _T1} = check(Env, E1, Arg1Type),
     {Env2, Res2, _T2} = check(Env1, E2, Arg2Type),
     IsSame = hm:isSubType(RetType, Type),
@@ -164,3 +165,44 @@ localConstraintSolver(Env, InfCs, InfPs) ->
     Ps = hm:subPs(InfPs, Sub),
     {Sub_, _RemPs}   = hm:solvePreds(rt:defaultClasses(), Ps),
     hm:subE(Env, hm:comp(Sub_, Sub)).
+
+%% Look up for function type and specialize
+-spec lookup(hm:tvar(),hm:env(),integer()) -> hm:type().
+lookup(X,Env,L) ->
+    case env:isGuardExprEnabled(Env) of
+        false -> lookup_(X,Env,L);
+        true  -> 
+            case env:checkGuard(X,Env) of
+                undefined   ->
+                    lookup_(X, Env, L);
+                T           -> T
+            end
+    end.
+
+-spec lookup_(hm:tvar(),hm:env(),integer()) -> hm:type().
+lookup_(X,Env,L) ->
+    case env:lookup(X,Env) of
+        undefined ->
+            case env:lookup_ext_binding(X,Env) of 
+                undefined ->
+                    erlang:error({type_error,util:to_string(X) ++ 
+                        " not bound on line " ++ util:to_string(L)});
+                ET        -> ET
+            end;
+        T         -> T
+    end.
+
+lookupRemote(X,Env,L,Module) ->
+    case env:lookupRemote(Module, X, Env) of
+        undefined   ->
+                erlang:error({type_error,util:to_string(X) ++ 
+                            " on line " ++ util:to_string(L) ++ 
+                            " is not exported by module " ++ util:to_string(Module)});
+        na          ->
+            {_,ArgLen} = X,
+            ArgTypes = lists:map(fun hm:fresh/1, lists:duplicate(ArgLen,L)),
+            {hm:funt(ArgTypes,hm:fresh(L),L),[]};
+        T           -> 
+            {FT,Ps} = hm:freshen(T), 
+            {hm:replaceLn(FT,0,L),Ps}
+    end.
