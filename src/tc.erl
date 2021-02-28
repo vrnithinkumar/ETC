@@ -152,7 +152,7 @@ checkArgType(Env, ArgPattern, ArgType) ->
 checkClauseBody(Env, BodyExprs, Type) ->
     {Env_, CsBody, PsBody} = lists:foldl(
         fun(Expr, {Ei,Csi,Psi}) -> 
-            {Ei_,Csi_,Psi_} = etc:checkExpr(Ei,Expr),
+            {Ei_,Csi_,Psi_} = etc:checkExpr(Ei, Expr),
             {Ei_, Csi ++ Csi_, Psi ++ Psi_}
         end, {Env,[],[]}, lists:droplast(BodyExprs)),
     SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
