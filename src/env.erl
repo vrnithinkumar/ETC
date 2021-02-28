@@ -9,6 +9,7 @@
         ,isGuardExprEnabled/1 %,addModuleBindings/2
         ,addExtModuleBindings/2,lookup_ext_binding/2
         ,printExtBindings/1, dumpModuleSpecs/2
+        ,lookup_type_var/2, extend_type_var/3
         ,readModuleSpecs/1, lookup_spec_binding/2, addSpecs/2, getSpecs/1]).
 
 -export_type([env/0]).
@@ -20,14 +21,15 @@
 
 % Type checker ENvironment
 -record(ten, 
-    {   bindings        = [],
-        ext_bindings    = [],
-        specs_env       = spec:empty(),
-        constructors    = [],
-        recFieldMap     = [],
-        guardExpr       = [],
-        isPattern       = false,
-        isGuardExpr     = false
+    {   bindings          = [],
+        ext_bindings      = [],
+        type_var_bindings = [],
+        specs_env         = spec:empty(),
+        constructors      = [],
+        recFieldMap       = [],
+        guardExpr         = [],
+        isPattern         = false,
+        isGuardExpr       = false
     }).
 
 -type env() :: ten.
@@ -46,7 +48,7 @@ lookup({_Func, _ArgCount} = X,Env) ->
             end;
          Res -> Res
     end;
-lookup(X,Env) -> proplists:get_value(X,Env#ten.bindings).
+lookup(X,Env) -> proplists:get_value(X, Env#ten.bindings).
 
 lookup_ext_binding(X,Env) -> proplists:get_value(X, Env#ten.ext_bindings).
 
@@ -172,3 +174,9 @@ isPatternInf(Env) ->
 
 setPatternInf(Env) ->
     Env#ten{isPattern = true}.
+
+%%%%%%%%% Existential Type Variable bindings.
+lookup_type_var(X, Env) -> proplists:get_value(X, Env#ten.type_var_bindings).
+
+extend_type_var(X, A, Env) ->
+    Env#ten{type_var_bindings = [{X, A} | Env#ten.type_var_bindings]}.
