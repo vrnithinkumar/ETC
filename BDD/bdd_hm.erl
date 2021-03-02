@@ -31,7 +31,10 @@ showList(List) ->
     ListToShow.
 
 % const resetTSkolId = () => { _tskolid = 0 };
-freshTSkol() -> make_ref().
+freshTSkol() -> tSkol(make_ref()).
+
+freshTMeta(Tvs, Mono) -> tMeta(make_ref(), Tvs, Mono).
+freshTMeta(Tvs) -> freshTMeta(Tvs, false).
 
 subset([A|As], B) ->
     case lists:member(B, A) of
@@ -143,6 +146,15 @@ unifyTMeta(Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
         false -> 
             terr("unifyTMeta failed: " ++ showType(M) ++ ":=" ++ showType(T))
 end.
+
+subsume(Tvs, A, {tForall, Name_A, Body_A}=B) -> 
+    Sk = freshTSkol(),
+    {tSkol, SkId} = Sk,
+    unify([SkId] ++ Tvs, A, openTForall(B, Sk));
+subsume(Tvs, {tForall, Name_A, Body_A}=A, B) ->
+    M = freshTMeta(Tvs),
+    unify(Tvs, openTForall(A, M), B);
+subsume(Tvs, A, B) -> unify(Tvs, A, B).
 
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
