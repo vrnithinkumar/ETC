@@ -4,6 +4,11 @@
 
 % convert the js code in erlang
 
+%% PRINT Debugging macro%%
+-ifndef(PRINT).
+-define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
+-endif.
+
 % Terms
 var(Name)        -> {var, Name}.
 abs(Name, Body)  -> {abs, Name, Body}.
