@@ -25,7 +25,10 @@ showList(List) ->
     ListToShow = io_lib:format("~p",[List]),
     ListToShow.
 
-subset ([A|As], B) ->
+% const resetTSkolId = () => { _tskolid = 0 };
+freshTSkol() -> make_ref().
+
+subset([A|As], B) ->
     case lists:member(B, A) of
         true  -> subset(As, B);
         false -> false
@@ -100,7 +103,29 @@ checkSolution({tMeta, _, Tvs, _, _}, {tSkol, Id}) ->
     lists:member(Id, Tvs);
 checkSolution(_M, _T) -> true.
 
-unify(Tvs, A, A) -> no_return.
+unify(_Tvs, A, A) -> no_return;
+unify(_Tvs, {tVar, Name_A}, {tVar, Name_B}) when Name_A == Name_B ->
+    no_return;
+unify(Tvs, {tFun, Left_A, Right_A}, {tFun, Left_B, Right_B}) ->
+    unify(Tvs, Left_A, Left_B),
+    unify(Tvs, Right_A, Right_B),
+    no_return;
+unify(Tvs, {tApp, Left_A, Right_A}, {tApp, Left_B, Right_B}) ->
+    unify(Tvs, Left_A, Left_B),
+    unify(Tvs, Right_A, Right_B),
+    no_return;
+unify(Tvs, {tForall, Name_A, Body_A}=A, {tForall, Name_A, Body_A}=B) ->
+    Sk = freshTSkol(),
+    {tSkol, SkId} = Sk,
+    unify([SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk)),
+    no_return;
+unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
+    unifyTMeta(Tvs, A, B);
+unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
+    unifyTMeta(Tvs, B, A);
+unify(Tvs, A, B) ->
+    terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
+
 
 unifyTMeta(_Tvs, M, M) -> no_return;
 unifyTMeta(Tvs, {tMeta, _, _, Type, _}, T) ->
