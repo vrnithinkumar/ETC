@@ -25,6 +25,13 @@ showList(List) ->
     ListToShow = io_lib:format("~p",[List]),
     ListToShow.
 
+subset ([A|As], B) ->
+    case lists:member(B, A) of
+        true  -> subset(As, B);
+        false -> false
+    end;
+subset (_A, _B) -> true.
+
 showType({tVar, Name}) -> Name;
 showType({tMeta, Id, Tvs, Type, Mono}) ->
     MonoStr = case Mono of
@@ -71,6 +78,41 @@ substTVar(X, S, {tForall, Name, Body}) when Name /= X ->
 substTVar(_X, _S, T) -> T.
 
 openTForall({tForall, Name, Body}, T) -> substTVar(Name, T, Body).
+
+% Subtyping
+checkSolution(T, T) -> false;
+checkSolution({tMeta, Id_m, Tvs_m, Type_m, Mono_m} = M, {tMeta, Id_t, Tvs_t, Type_t, Mono_t} = T) ->
+% todo     if (m.mono) t.mono = true;
+    case Type_t of
+        null -> checkSolution(M, Type_t);
+        _    -> subset(Tvs_m, Tvs_t)
+    end;
+checkSolution(M, {tFun, Left, Right}) ->
+    checkSolution(M, Left) and checkSolution(M, Right);
+checkSolution(M, {tApp, Left, Right}) ->
+    checkSolution(M, Left) and checkSolution(M, Right);
+checkSolution({tMeta, _, _, _, Mono} = M, {tForall, _, Body}) ->
+    case Mono of
+        true -> false;
+        false -> checkSolution(M, Body)
+    end;
+checkSolution({tMeta, _, Tvs, _, _}, {tSkol, Id}) ->
+    lists:member(Id, Tvs);
+checkSolution(_M, _T) -> true.
+
+unify(Tvs, A, A) -> no_return.
+
+unifyTMeta(_Tvs, M, M) -> no_return;
+unifyTMeta(Tvs, {tMeta, _, _, Type, _}, T) ->
+    unify(Tvs, Type, T);
+unifyTMeta(Tvs, {tMeta, _, _, _, _}=M, {tMeta, _, _, Type, _} = T) ->
+    unifyTMeta(Tvs, M, Type);
+unifyTMeta(Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
+    case checkSolution(M, T) of
+        true  -> {tMeta, Id, Tvs, T, Mono};
+        false -> 
+            terr("unifyTMeta failed: " ++ showType(M) ++ ":=" ++ showType(T))
+end.
 
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
