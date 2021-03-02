@@ -51,6 +51,27 @@ showTerm({app, Left, Right}) ->
 showTerm({ann, Term, Type}) -> 
     "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")".
 
+prune({tMeta, Id, Tvs, Type, Mono}) when Type /= null ->
+    prune(Type);
+    % {tMeta, Id, Tvs, prune(Type), Mono};
+prune({tFun, Left, Right}) -> tFun(prune(Left), prune(Right));
+prune({tApp, Left, Right}) -> tApp(prune(Left), prune(Right));
+prune({tForall, Name, Body}) -> tForall(Name, prune(Body));
+prune(T) -> T.
+
+substTVar(X, S, {tVar, Name}=T) when Name == X -> S;
+substTVar(X, S, {tMeta, Id, Tvs, Type, Mono}) when Type /= null ->
+    substTVar(X, S, Type);
+substTVar(X, S, {tFun, Left, Right}) ->
+    tFun(substTVar(X, S, Left), substTVar(X, S, Right));
+substTVar(X, S, {tApp, Left, Right}) ->
+    tApp(substTVar(X, S, Left), substTVar(X, S, Right));
+substTVar(X, S, {tForall, Name, Body}) when Name /= X ->
+    tForall(Name, substTVar(X, S, Body));
+substTVar(_X, _S, T) -> T.
+
+openTForall({tForall, Name, Body}, T) -> substTVar(Name, T, Body).
+
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
     VAR_ = var("X"),
