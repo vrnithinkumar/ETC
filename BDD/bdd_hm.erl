@@ -253,6 +253,15 @@ infer(Env, Term) ->
     Ty = synth(Env, [], Term),
     prune(Ty).
 
+%% ------------- Tests ------------%%
+% Helpers for testing
+v(N) -> var(N).
+tv(N) -> tVar(N).
+tid() -> tForall("t", tFun(tv("t"), tv("t"))).
+list(T) -> tApp(tv("List"), T).
+st(S, T) -> tApp(tApp(tv("ST"), S), T).
+pair(A, B) -> tApp(tApp(tv("Pair"), A), B).
+
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
     VAR_ = var("X"),
