@@ -292,6 +292,50 @@ env() -> #{
   "r" => tFun(tForall("a", tFun(tv("a"), tid())), tv("Int"))
 }.
 
+test_cases() -> [
+  %    A
+  abs("x", abs("y", v("x"))),
+  app(v("choose"), v("id")),
+  ann(app(v("choose"), v("id")), tFun(tid(), tid())),
+  app(app(v("choose"), v("Nil")), v("ids")),
+  app(v("id"), v("auto")),
+  app(v("id"), v("auto2")),
+  app(app(v("choose"), v("id")), v("auto")),
+  app(app(v("choose"), v("id")), v("auto2")), % X
+  app(app(v("f"), app(v("choose"), v("id"))), v("ids")), % X
+  app(app(v("f"), ann(app(v("choose"), v("id")), tFun(tid(), tid()))), v("ids")),
+  app(v("poly"), v("id")),
+  app(v("poly"), abs("x", v("x"))),
+  app(app(v("id"), v("poly")), abs("x", v("x"))),
+
+  %% B
+
+  %% C
+  app(v("length"), v("ids")),
+  app(v("tail"), v("ids")),
+  app(v("head"), v("ids")),
+  app(v("single"), v("id")),
+  ann(app(v("single"), v("id")), listT(tid())),
+  app(app(v("Cons"), v("id")), v("ids")),
+  app(app(v("Cons"), abs("x", v("x"))), v("ids")),
+  app(app(v("append"), app(v("single"), v("inc"))), app(v("single"), v("id"))),
+  app(app(v("g"), app(v("single"), v("id"))), v("ids")), %% X
+  app(app(v("g"), ann(app(v("single"), v("id")), listT(tid()))), v("ids")),
+  app(app(v("map"), v("poly")), app(v("single"), v("id"))),
+  app(app(v("map"), v("head")), app(v("single"), v("ids"))),
+
+  %% D
+  app(app(v("app"), v("poly")), v("id")),
+  app(app(v("revapp"), v("id")), v("poly")),
+  app(v("runST"), v("argST")),
+  app(app(v("app"), v("runST")), v("argST")),
+  app(app(v("revapp"), v("argST")), v("runST")),
+
+  %% E
+  app(app(v("k"), v("h")), v("l")), %% X
+  app(app(v("k"), abs("x", app(v("h"), v("x")))), v("l")),
+  app(v("r"), abs("x", abs("y", v("y"))))
+].
 
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
