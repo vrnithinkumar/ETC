@@ -21,7 +21,7 @@ tForall(Name, Body)        -> {tForall, Name, Body}.
 tFun(Left, Right)          -> {tFun, Left, Right}.
 tApp(Left, Right)          -> {tApp, Left, Right}.
 tMeta(Id, Tvs, Mono)       -> {tMeta, Id, Tvs, null, Mono}.
-tMeta(Id, Tvs, Type, Mono) -> {tMeta, Id, Tvs, Type, Mono}.
+% tMeta(Id, Tvs, Type, Mono) -> {tMeta, Id, Tvs, Type, Mono}.
 tSkol(Id)                  -> {tSkol, Id}.
 
 terr(Reason) -> erlang:error("Type Error: " ++ Reason).
@@ -60,16 +60,18 @@ showType({tFun, Left, Right}) ->
     "(" ++ showType(Left) ++ " -> " ++ showType(Right) ++ ")";
 showType({tApp, Left, Right}) ->
     "(" ++ showType(Left) ++ " " ++ showType(Right) ++ ")";
-showType({tSkol, Id}) -> Id.
+showType({tSkol, Id}) -> Id;
+showType(Ty) -> io_lib:format("Unknown type: ~p",[Ty]).
 
 showTerm({var, Name}) -> Name;
 showTerm({abs, Name, Body}) -> "(\\" ++ Name ++ "." ++ showTerm(Body) ++ ")";
 showTerm({app, Left, Right}) ->
     "(" ++ showTerm(Left) ++ " " ++ showTerm(Right) ++ ")";
 showTerm({ann, Term, Type}) -> 
-    "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")".
+    "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")";
+showTerm(Term) -> io_lib:format("Unknown term: ~p",[Term]).
 
-prune({tMeta, Id, Tvs, Type, Mono}) when Type /= null ->
+prune({tMeta, _Id, _Tvs, Type, _Mono}) when Type /= null ->
     prune(Type);
     % {tMeta, Id, Tvs, prune(Type), Mono};
 prune({tFun, Left, Right}) -> tFun(prune(Left), prune(Right));
@@ -98,7 +100,7 @@ openTForall({tForall, Name, Body}, T) -> substTVar(Name, T, Body).
 
 % Subtyping
 checkSolution(T, T) -> false;
-checkSolution({tMeta, Id_m, Tvs_m, Type_m, Mono_m} = M, {tMeta, Id_t, Tvs_t, Type_t, Mono_t} = T) ->
+checkSolution({tMeta, _, Tvs_m, _, _} = M, {tMeta, _, Tvs_t, Type_t, _}) ->
 % todo     if (m.mono) t.mono = true;
     case Type_t of
         null -> checkSolution(M, Type_t);
@@ -135,16 +137,16 @@ unify(Tvs, {tForall, Name_A, Body_A}=A, {tForall, Name_A, Body_A}=B) ->
     no_return;
 unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
     unifyTMeta(Tvs, A, B);
-unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
+unify(Tvs, A , {tMeta, _, _, _, _} = B) ->
     unifyTMeta(Tvs, B, A);
 unify(_Tvs, A, B) ->
     terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
 
 
 unifyTMeta(_Tvs, M, M) -> no_return;
-unifyTMeta(Tvs, {tMeta, _, _, Type, _}, T) ->
+unifyTMeta(Tvs, {tMeta, _, _, Type, _}, T) when Type /= null ->
     unify(Tvs, Type, T);
-unifyTMeta(Tvs, {tMeta, _, _, _, _}=M, {tMeta, _, _, Type, _} = T) ->
+unifyTMeta(Tvs, M, {tMeta, _, _, Type, _}) when Type /= null ->
     unifyTMeta(Tvs, M, Type);
 unifyTMeta(Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
     case checkSolution(M, T) of
@@ -153,18 +155,18 @@ unifyTMeta(Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
             terr("unifyTMeta failed: " ++ showType(M) ++ ":=" ++ showType(T))
 end.
 
-subsume(Tvs, A, {tForall, Name_A, Body_A}=B) -> 
+subsume(Tvs, A, {tForall, _, _}=B) -> 
     Sk = freshTSkol(),
     {tSkol, SkId} = Sk,
     unify([SkId] ++ Tvs, A, openTForall(B, Sk));
-subsume(Tvs, {tForall, Name_A, Body_A}=A, B) ->
+subsume(Tvs, {tForall, _, _}=A, B) ->
     M = freshTMeta(Tvs),
     unify(Tvs, openTForall(A, M), B);
 subsume(Tvs, A, B) -> unify(Tvs, A, B).
 
 % Inference/ Synthesis
 synth(Env, _Tvs, {var, Name}) ->
-    case maps:get(Env, Name, not_found) of 
+    case maps:get(Name, Env, not_found) of 
         not_found -> terr("undefined var : " ++  Name);
         Ty -> Ty
     end;
@@ -347,6 +349,8 @@ tests() ->
     ok.
 
 tests_full_infer() ->
+    % Test = maps:get(env(), "x", undefined),
+    % ?PRINT(Test)
     Term = abs("x", abs("y", v("x"))),
     Ty = infer(env(), Term),
     Res = showTerm(Term) ++ showType(Ty),
