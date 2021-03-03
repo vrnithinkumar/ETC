@@ -1,6 +1,6 @@
 -module(bdd_hm).
 
--export([tests/0]).
+-export([tests/0, tests_full_infer/0]).
 
 % convert the js code in erlang
 
@@ -137,7 +137,7 @@ unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
     unifyTMeta(Tvs, A, B);
 unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
     unifyTMeta(Tvs, B, A);
-unify(Tvs, A, B) ->
+unify(_Tvs, A, B) ->
     terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
 
 
@@ -163,7 +163,7 @@ subsume(Tvs, {tForall, Name_A, Body_A}=A, B) ->
 subsume(Tvs, A, B) -> unify(Tvs, A, B).
 
 % Inference/ Synthesis
-synth(Env, Tvs, {var, Name}) ->
+synth(Env, _Tvs, {var, Name}) ->
     case maps:get(Env, Name, not_found) of 
         not_found -> terr("undefined var : " ++  Name);
         Ty -> Ty
@@ -171,11 +171,11 @@ synth(Env, Tvs, {var, Name}) ->
 synth(Env, Tvs, {ann, Term, Type}) ->
     check(Env, Tvs, Term, Type),
     Type;
-synth(Env, Tvs, {app, Left, Right}=Term) ->
+synth(Env, Tvs, {app, _Left, _Right}=Term) ->
     {FT, As} = flattenApp(Term),
     Ty = synth(Env, Tvs, FT),
     synthapps(Env, Tvs, Ty, As, null, []);
-synth(Env, Tvs, {abs, Name, Body}=Term) ->
+synth(Env, Tvs, {abs, Name, Body}) ->
     A = freshTMeta(Tvs, true),
     B = freshTMeta(Tvs),
     check(maps:insert(Name, A, Env), Tvs, Body, B),
@@ -205,10 +205,10 @@ synthapps(Env, Tvs, {tMeta, _Id, Tvs_m, Type, _}, As, Ety, Acc) when length(As) 
     end;
 synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
     terr("synthapps failed, not a function type: " ++ showType(Ty));
-synthapps(Env, Tvs, Ty, As, Ety, Acc) ->
+synthapps(Env, Tvs, Ty, _As, Ety, Acc) ->
     case Ety of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
-        NotNull -> unify(Tvs, Ty, Ety)
+        NotNull -> unify(Tvs, Ty, NotNull)
     end,
     Ty.
 
@@ -343,5 +343,11 @@ tests() ->
     ID_ABS = abs("X", VAR_),
     APP_ = app(ID_ABS, VAR_),
     ANN_ = ann(ID_ABS, IDType),
-    lists:map(fun(Term) -> showTerm(Term) end, [VAR_, ID_ABS, APP_, ANN_])
-    .
+    lists:map(fun(Term) -> showTerm(Term) end, [VAR_, ID_ABS, APP_, ANN_]),
+    ok.
+
+tests_full_infer() ->
+    Term = abs("x", abs("y", v("x"))),
+    Ty = infer(env(), Term),
+    Res = showTerm(Term) ++ showType(Ty),
+    io:fwrite("Type Res: ~p ~n",[Res]).
