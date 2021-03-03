@@ -196,6 +196,7 @@ synthapps(Env, Tvs, {tMeta, _Id, Tvs_m, Type, _}, As, Ety, Acc) when length(As) 
         A = freshTMeta(Tvs_m),
         B = freshTMeta(Tvs_m),
         % ty.type = TFun(a, b),
+        %  BUG: Potential
         Ty_Type = tFun(A, B),
         [TM | AsTail] = As,
         Acc_ = Acc ++ [{TM, A}],
@@ -204,7 +205,31 @@ synthapps(Env, Tvs, {tMeta, _Id, Tvs_m, Type, _}, As, Ety, Acc) when length(As) 
     end;
 synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
     terr("synthapps failed, not a function type: " ++ showType(Ty));
-synthapps(Env, Tvs, Ty, As, Ety, Acc) -> ok.
+synthapps(Env, Tvs, Ty, As, Ety, Acc) ->
+    case Ety of
+        null    -> pickAndCheckArgs(Env, Tvs, Acc);
+        NotNull -> unify(Tvs, Ty, Ety)
+    end,
+    Ty.
+
+% Bug to check
+pickAndCheckArgs(_, _, []) -> done;
+pickAndCheckArgs(Env, Tvs, Acc) ->
+    {{Tm, TmTy}, RestAcc} = pickArg(Acc),
+    check(Env, Tvs, Tm, TmTy),
+    pickAndCheckArgs(Env, Tvs, RestAcc).
+
+% Bug to check
+pickArg(Acc) -> pickArg_(Acc, []).
+pickArg_(Acc_Done, []) ->
+    % Nothing match return shift
+    {hd(Acc_Done), tl(Acc_Done)};
+pickArg_(Acc_Done, [{F,S} | Acc_Rem]) ->
+    case S of
+        {tMeta, _, _, _, _} ->
+            {{F,S}, Acc_Done ++ Acc_Rem};
+        _ -> pickArg_(Acc_Done ++ [{F,S}], Acc_Rem)
+    end.
 
 check(Env, Tvs, Term, {tMeta, _, _, Type, _}) when Type /= null->
     check(Env, Tvs, Term, Type);
@@ -221,6 +246,12 @@ check(Env, Tvs, {app, _, _} = Term, Ty) ->
 check(Env, Tvs, Term, Ty) ->
     Inf  = synth(Env, Tvs, Term),
     subsume(Tvs, Inf, Ty).
+
+infer(Env, Term) ->
+    % resetTMetaId();
+    % resetTSkolId();
+    Ty = synth(Env, [], Term),
+    prune(Ty).
 
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
