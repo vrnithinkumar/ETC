@@ -77,6 +77,12 @@ prune({tApp, Left, Right}) -> tApp(prune(Left), prune(Right));
 prune({tForall, Name, Body}) -> tForall(Name, prune(Body));
 prune(T) -> T.
 
+flattenApp({app, Left, Right}) ->
+    {T, Args} = flattenApp (Left),
+    {T, Args ++ [Right]};
+    % {T, [Right] ++ Args};
+flattenApp(T) -> {T, []}.
+
 substTVar(X, S, {tVar, Name}=T) when Name == X -> S;
 substTVar(X, S, {tMeta, Id, Tvs, Type, Mono}) when Type /= null ->
     substTVar(X, S, Type);
@@ -155,6 +161,47 @@ subsume(Tvs, {tForall, Name_A, Body_A}=A, B) ->
     M = freshTMeta(Tvs),
     unify(Tvs, openTForall(A, M), B);
 subsume(Tvs, A, B) -> unify(Tvs, A, B).
+
+% Inference/ Synthesis
+synth(Env, Tvs, {var, Name}) ->
+    case maps:get(Env, Name, not_found) of 
+        not_found -> terr("undefined var : " ++  Name);
+        Ty -> Ty
+    end;
+synth(Env, Tvs, {ann, Term, Type}) ->
+    check(Env, Tvs, Term, Type),
+    Type;
+synth(Env, Tvs, {app, Left, Right}=Term) ->
+    {FT, As} = flattenApp(Term),
+    Ty = synth(Env, Tvs, FT),
+    synthapps(Env, Tvs, Ty, As);
+synth(Env, Tvs, {abs, Name, Body}=Term) ->
+    A = freshTMeta(Tvs, true),
+    B = freshTMeta(Tvs),
+    check(maps:insert(Name, A, Env), Tvs, Body, B),
+    tFun(A, B);
+synth(_, _, Term) ->
+    terr("cannot synth : " ++ showTerm(Term)).
+
+synthapps(Env, Tvs, Ty, As) -> ok.
+synthapps(Env, Tvs, Ty, As, Ety) -> ok.
+synthapps(Env, Tvs, Ty, As, Ety, Acc) -> ok.
+
+check(Env, Tvs, Term, {tMeta, _, _, Type, _}) when Type /= null->
+    check(Env, Tvs, Term, Type);
+check(Env, Tvs, Term, {tForall, _, _} = Ty) ->
+    Sk = freshTSkol(),
+    {tSkol, SkId} = Sk,
+    check(Env, [SkId] ++ Tvs, Term, openTForall(Ty, Sk));
+check(Env, Tvs, {abs, Name, Body}, {tFun, Left, Right}) ->
+    check(maps:insert(Name, Left, Env), Tvs, Body, Right);
+check(Env, Tvs, {app, _, _} = Term, Ty) ->
+    {FT, As} = flattenApp(Term),
+    FTy = synth(Env, Tvs, FT),
+    synthapps(Env, Tvs, FTy, As, Ty);
+check(Env, Tvs, Term, Ty) ->
+    Inf  = synth(Env, Tvs, Term),
+    subsume(Tvs, Inf, Ty).
 
 tests() ->
     IDType = tForall("t", tFun(tVar("t"), tVar("t"))),
