@@ -174,7 +174,7 @@ synth(Env, Tvs, {ann, Term, Type}) ->
 synth(Env, Tvs, {app, Left, Right}=Term) ->
     {FT, As} = flattenApp(Term),
     Ty = synth(Env, Tvs, FT),
-    synthapps(Env, Tvs, Ty, As);
+    synthapps(Env, Tvs, Ty, As, null, []);
 synth(Env, Tvs, {abs, Name, Body}=Term) ->
     A = freshTMeta(Tvs, true),
     B = freshTMeta(Tvs),
@@ -183,8 +183,27 @@ synth(Env, Tvs, {abs, Name, Body}=Term) ->
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
 
-synthapps(Env, Tvs, Ty, As) -> ok.
-synthapps(Env, Tvs, Ty, As, Ety) -> ok.
+synthapps(Env, Tvs, {tForall, _, _} = Ty, As, Ety, Acc) ->
+    M = freshTMeta(Tvs),
+    synthapps(Env, Tvs, openTForall(Ty, M), As, Ety, Acc);
+synthapps(Env, Tvs, {tFun, Left, Right}, As, Ety, Acc) when length(As) > 0 ->
+    [TM | AsTail] = As,
+    Acc_ = Acc ++ [{TM, Left}],
+    synthapps(Env, Tvs, Right, AsTail, Ety, Acc_);
+synthapps(Env, Tvs, {tMeta, _Id, Tvs_m, Type, _}, As, Ety, Acc) when length(As) > 0 ->
+    case Type of
+        null  -> 
+        A = freshTMeta(Tvs_m),
+        B = freshTMeta(Tvs_m),
+        % ty.type = TFun(a, b),
+        Ty_Type = tFun(A, B),
+        [TM | AsTail] = As,
+        Acc_ = Acc ++ [{TM, A}],
+        synthapps(Env, Tvs, B, AsTail, Ety, Acc_);
+        Valid -> synthapps(Env, Tvs, Valid, As, Ety, Acc)
+    end;
+synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
+    terr("synthapps failed, not a function type: " ++ showType(Ty));
 synthapps(Env, Tvs, Ty, As, Ety, Acc) -> ok.
 
 check(Env, Tvs, Term, {tMeta, _, _, Type, _}) when Type /= null->
@@ -198,7 +217,7 @@ check(Env, Tvs, {abs, Name, Body}, {tFun, Left, Right}) ->
 check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     FTy = synth(Env, Tvs, FT),
-    synthapps(Env, Tvs, FTy, As, Ty);
+    synthapps(Env, Tvs, FTy, As, Ty, []);
 check(Env, Tvs, Term, Ty) ->
     Inf  = synth(Env, Tvs, Term),
     subsume(Tvs, Inf, Ty).
