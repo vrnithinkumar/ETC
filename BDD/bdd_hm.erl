@@ -83,8 +83,8 @@ flattenApp({app, Left, Right}) ->
     % {T, [Right] ++ Args};
 flattenApp(T) -> {T, []}.
 
-substTVar(X, S, {tVar, Name}=T) when Name == X -> S;
-substTVar(X, S, {tMeta, Id, Tvs, Type, Mono}) when Type /= null ->
+substTVar(X, S, {tVar, Name}) when Name == X -> S;
+substTVar(X, S, {tMeta, _Id, _Tvs, Type, _}) when Type /= null ->
     substTVar(X, S, Type);
 substTVar(X, S, {tFun, Left, Right}) ->
     tFun(substTVar(X, S, Left), substTVar(X, S, Right));
@@ -178,7 +178,7 @@ synth(Env, Tvs, {app, _Left, _Right}=Term) ->
 synth(Env, Tvs, {abs, Name, Body}) ->
     A = freshTMeta(Tvs, true),
     B = freshTMeta(Tvs),
-    check(maps:insert(Name, A, Env), Tvs, Body, B),
+    check(maps:put(Name, A, Env), Tvs, Body, B),
     tFun(A, B);
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
@@ -238,7 +238,7 @@ check(Env, Tvs, Term, {tForall, _, _} = Ty) ->
     {tSkol, SkId} = Sk,
     check(Env, [SkId] ++ Tvs, Term, openTForall(Ty, Sk));
 check(Env, Tvs, {abs, Name, Body}, {tFun, Left, Right}) ->
-    check(maps:insert(Name, Left, Env), Tvs, Body, Right);
+    check(maps:put(Name, Left, Env), Tvs, Body, Right);
 check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     FTy = synth(Env, Tvs, FT),
