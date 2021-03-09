@@ -203,9 +203,11 @@ unify(Env, Tvs, {tForall, Name_A, Body_A}=A, {tForall, Name_A, Body_A}=B) ->
     Sk = freshTSkol(),
     {tSkol, SkId} = Sk,
     unify(Env, [SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
-unify(Env, Tvs, {tMeta, _, _, _, _} = A , B) ->
+unify(Env, Tvs, {tMeta, Id_m, _, _, _}, B) ->
+    A = get_meta(Env, Id_m),
     unifyTMeta(Env, Tvs, A, B);
-unify(Env, Tvs, A , {tMeta, _, _, _, _} = B) ->
+unify(Env, Tvs, A , {tMeta, Id_m, _, _, _}) ->
+    B = get_meta(Env, Id_m),
     unifyTMeta(Env, Tvs, B, A);
 unify(_Env, _Tvs, A, B) ->
     terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
@@ -428,12 +430,19 @@ tests() ->
     lists:map(fun(Term) -> showTerm(Term) end, [VAR_, ID_ABS, APP_, ANN_]),
     ok.
 
-all_tests() ->
-    lists:map(fun(Term) -> 
+infer_term(Term) -> 
+    try
         Ty = infer(init_env(), Term), 
         Res = showTerm(Term) ++ " :: " ++ showType(Ty),
-        io:fwrite("Type Res: ~p ~n",[Res]) end, 
-    test_cases()),
+        io:fwrite("~p ~n",[Res]) 
+    catch
+        error: Reason -> 
+        MSG = showTerm(Term) ++ " :: " ++ Reason,
+        io:fwrite("~p ~n",[MSG])
+    end.
+
+all_tests() ->
+    lists:map(fun(Term) -> infer_term(Term) end, test_cases()),
     done.
 
 tests_full_infer() ->
