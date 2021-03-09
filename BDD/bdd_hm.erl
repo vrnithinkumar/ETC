@@ -216,7 +216,7 @@ unifyTMeta(Env, Tvs, {tMeta, _, _, Type, _}, T) when Type /= null ->
     unify(Env, Tvs, Type, T);
 unifyTMeta(Env, Tvs, M, {tMeta, _, _, Type, _}) when Type /= null ->
     unifyTMeta(Env, Tvs, M, Type);
-unifyTMeta(Env, Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
+unifyTMeta(Env, Tvs, {tMeta, Id, _, _, Mono}=M, T) ->
     {Env_, Res} = checkSolution(Env, M, T),
     case Res of
         true  ->
@@ -409,7 +409,7 @@ test_cases() -> [
   app(app(v("app"), v("poly")), v("id")),
   app(app(v("revapp"), v("id")), v("poly")),
   %% TODO FIX
-  % app(v("runST"), v("argST")),
+  app(v("runST"), v("argST")),
   app(app(v("app"), v("runST")), v("argST")),
   app(app(v("revapp"), v("argST")), v("runST")),
 
