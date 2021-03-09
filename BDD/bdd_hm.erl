@@ -26,9 +26,14 @@ tSkol(Id)                  -> {tSkol, Id}.
 
 terr(Reason) -> erlang:error("Type Error: " ++ Reason).
 
+showList([]) -> "";
 showList(List) ->
     ListToShow = io_lib:format("~p",[List]),
-    ListToShow.
+    lists:flatten(ListToShow).
+
+showAny(Val) ->
+    ListToShow = io_lib:format("~p",[Val]),
+    lists:flatten(ListToShow).
 
 % const resetTSkolId = () => { _tskolid = 0 };
 freshTSkol() -> tSkol(make_ref()).
@@ -43,25 +48,41 @@ subset([A|As], B) ->
     end;
 subset (_A, _B) -> true.
 
-showType({tVar, Name}) -> Name;
-showType({tMeta, Id, Tvs, Type, Mono}) ->
+mapAndNext({Next, Map}, Ref) ->
+    case maps:get(Ref, Map, not_found) of
+        not_found -> {showAny(Next), {Next+1, maps:put(Ref, Next, Map)}};
+        Found -> {showAny(Found), {Next, Map}}
+    end.
+
+showType(Ty) ->
+    {TyStr, _} = showType_(Ty, {0, #{}}),
+    TyStr.
+
+showType_({tVar, Name}, State) -> {Name, State};
+showType_({tMeta, Id, Tvs, Type, Mono}, State) ->
     MonoStr = case Mono of
         true  -> "`";
         false -> ""
     end,
-    TypeStr = case Type of
-        null  -> "";
-        Valid -> showType(Valid)
+    {TypeStr, State_} = case Type of
+        null  -> {"", State};
+        Valid -> showType_(Valid, State)
     end,
-    "?" ++ MonoStr ++ Id ++ showList(Tvs) ++ TypeStr;
-showType({tForall, Name, Body}) ->
-    "(forall " ++ Name ++ ". " ++ showType(Body) ++ ")";
-showType({tFun, Left, Right}) ->
-    "(" ++ showType(Left) ++ " -> " ++ showType(Right) ++ ")";
-showType({tApp, Left, Right}) ->
-    "(" ++ showType(Left) ++ " " ++ showType(Right) ++ ")";
-showType({tSkol, Id}) -> Id;
-showType(Ty) -> io_lib:format("Unknown type: ~p",[Ty]).
+    {IdStr, State__} = mapAndNext(State_, Id),
+    {"?" ++ MonoStr ++ IdStr ++ showList(Tvs) ++ TypeStr, State__};
+showType_({tForall, Name, Body}, State) ->
+    {BdStr, State_} = showType_(Body, State),
+    {"(forall " ++ Name ++ ". " ++ BdStr ++ ")", State_};
+showType_({tFun, Left, Right}, State) ->
+    {LStr, State_} = showType_(Left, State),
+    {RStr, State__} = showType_(Right, State_),
+    {"(" ++ LStr ++ " -> " ++ RStr ++ ")", State__};
+showType_({tApp, Left, Right}, State) ->
+    {LStr, State_} = showType_(Left, State),
+    {RStr, State__} = showType_(Right, State_),
+    {"(" ++ LStr ++ " " ++ RStr ++ ")", State__};
+showType_({tSkol, Id}, State) -> {Id, State};
+showType_(Ty, _) -> io_lib:format("Unknown type: ~p", [Ty]).
 
 showTerm({var, Name}) -> Name;
 showTerm({abs, Name, Body}) -> "(\\" ++ Name ++ "." ++ showTerm(Body) ++ ")";
@@ -119,22 +140,21 @@ checkSolution({tMeta, _, Tvs, _, _}, {tSkol, Id}) ->
     lists:member(Id, Tvs);
 checkSolution(_M, _T) -> true.
 
-unify(_Tvs, A, A) -> no_return;
+unify(_Tvs, A, A) -> A;
 unify(_Tvs, {tVar, Name_A}, {tVar, Name_B}) when Name_A == Name_B ->
-    no_return;
+    {tVar, Name_A};
 unify(Tvs, {tFun, Left_A, Right_A}, {tFun, Left_B, Right_B}) ->
-    unify(Tvs, Left_A, Left_B),
-    unify(Tvs, Right_A, Right_B),
-    no_return;
+    Left_U = unify(Tvs, Left_A, Left_B),
+    Right_U = unify(Tvs, Right_A, Right_B),
+    {tFun, Left_U, Right_U};
 unify(Tvs, {tApp, Left_A, Right_A}, {tApp, Left_B, Right_B}) ->
-    unify(Tvs, Left_A, Left_B),
-    unify(Tvs, Right_A, Right_B),
-    no_return;
+    Left_U = unify(Tvs, Left_A, Left_B),
+    Right_U = unify(Tvs, Right_A, Right_B),
+    {tApp, Left_U, Right_U};
 unify(Tvs, {tForall, Name_A, Body_A}=A, {tForall, Name_A, Body_A}=B) ->
     Sk = freshTSkol(),
     {tSkol, SkId} = Sk,
-    unify([SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk)),
-    no_return;
+    unify([SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
 unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
     unifyTMeta(Tvs, A, B);
 unify(Tvs, A , {tMeta, _, _, _, _} = B) ->
@@ -143,7 +163,7 @@ unify(_Tvs, A, B) ->
     terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
 
 
-unifyTMeta(_Tvs, M, M) -> no_return;
+unifyTMeta(_Tvs, M, M) -> M;
 unifyTMeta(Tvs, {tMeta, _, _, Type, _}, T) when Type /= null ->
     unify(Tvs, Type, T);
 unifyTMeta(Tvs, M, {tMeta, _, _, Type, _}) when Type /= null ->
@@ -351,7 +371,11 @@ tests() ->
 tests_full_infer() ->
     % Test = maps:get(env(), "x", undefined),
     % ?PRINT(Test)
-    Term = abs("x", abs("y", v("x"))),
+    % Term = abs("x", v("x")),
+    Term = app(v("id"), v("id")),
+    % Term = abs("x", abs("y", v("x"))),
+    % Term = ann(app(v("choose"), v("id")), tFun(tid(), tid())),
     Ty = infer(env(), Term),
-    Res = showTerm(Term) ++ showType(Ty),
+    % ?PRINT(Ty),
+    Res = showTerm(Term) ++ " :: " ++ showType(Ty),
     io:fwrite("Type Res: ~p ~n",[Res]).
