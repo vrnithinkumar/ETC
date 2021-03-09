@@ -51,6 +51,10 @@ showAny(Val) ->
     ListToShow = io_lib:format("~p",[Val]),
     lists:flatten(ListToShow).
 
+intToChar(Val) ->
+    L = Val + 65,
+    io_lib:format("~c", [L]).
+
 % const resetTSkolId = () => { _tskolid = 0 };
 freshTSkol() -> tSkol(make_ref()).
 
@@ -70,8 +74,8 @@ subset (_A, _B) -> true.
 
 mapAndNext({Next, Map}, Ref) ->
     case maps:get(Ref, Map, not_found) of
-        not_found -> {showAny(Next), {Next+1, maps:put(Ref, Next, Map)}};
-        Found -> {showAny(Found), {Next, Map}}
+        not_found -> {intToChar(Next), {Next+1, maps:put(Ref, Next, Map)}};
+        Found -> {intToChar(Found), {Next, Map}}
     end.
 
 showType(Ty) ->
@@ -428,7 +432,8 @@ tests_full_infer() ->
     % ?PRINT(Test)
     % Term = abs("x", v("x")),
     % Term = v("id"),
-    Term = app(v("id"), v("id")),
+    % Term = app(v("id"), v("id")),
+    Term = abs("x", abs("y", v("x"))),
     % Term = abs("x", abs("y", v("x"))),
     % Term = ann(app(v("choose"), v("id")), tFun(tid(), tid())),
     Ty = infer(init_env(), Term),
