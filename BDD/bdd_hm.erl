@@ -16,14 +16,14 @@
     metaMap  = #{}
 }).
 
-get_binding(Env, Ref) -> 
-    maps:get(Ref, Env#ten.bindings, not_found).
-set_binding(Env, Ref, Type) ->
-    Env#ten{bindings = maps:put(Ref, Type, Env#ten.bindings)}.
-get_Meta(Env, Ref) -> 
-    maps:get(Ref, Env#ten.metaMap, not_found).
-set_Meta(Env, Ref, Type) ->
-    Env#ten{metaMap = maps:put(Ref, Type, Env#ten.metaMap)}.
+get_binding(Env, X) -> 
+    maps:get(X, Env#ten.bindings, not_found).
+set_binding(Env, X, Type) ->
+    Env#ten{bindings = maps:put(X, Type, Env#ten.bindings)}.
+get_meta(Env, Id) -> 
+    maps:get(Id, Env#ten.metaMap, not_found).
+set_meta(Env, Id, Type) ->
+    Env#ten{metaMap = maps:put(Id, Type, Env#ten.metaMap)}.
 
 % Terms
 var(Name)        -> {var, Name}.
@@ -54,8 +54,12 @@ showAny(Val) ->
 % const resetTSkolId = () => { _tskolid = 0 };
 freshTSkol() -> tSkol(make_ref()).
 
-freshTMeta(Tvs, Mono) -> tMeta(make_ref(), Tvs, Mono).
-freshTMeta(Tvs) -> freshTMeta(Tvs, false).
+freshTMeta(Env, Tvs, Mono) ->
+    Ref = make_ref(),
+    TM = tMeta(Ref, Tvs, Mono),
+    Env_ = set_meta(Env, Ref, TM),
+    {Env_, TM}.
+freshTMeta(Env, Tvs) -> freshTMeta(Env, Tvs, false).
 
 subset([A|As], B) ->
     case lists:member(B, A) of
@@ -76,6 +80,8 @@ showType(Ty) ->
 
 showType_({tVar, Name}, State) -> {Name, State};
 showType_({tMeta, Id, Tvs, Type, Mono}, State) ->
+    % TODO
+    % {tMeta, Id, Tvs, Type, Mono} = get_meta(Env, Id),
     MonoStr = case Mono of
         true  -> "`";
         false -> ""
@@ -136,126 +142,145 @@ substTVar(_X, _S, T) -> T.
 openTForall({tForall, Name, Body}, T) -> substTVar(Name, T, Body).
 
 % Subtyping
-checkSolution(T, T) -> false;
-checkSolution({tMeta, _, Tvs_m, _, _} = M, {tMeta, _, Tvs_t, Type_t, _}) ->
+checkSolution(Env, T, T) -> {Env, false};
+checkSolution(Env, {tMeta, Id_m, _, _, _} = M, {tMeta, Id_t, _, _, _}) ->
 % todo     if (m.mono) t.mono = true;
+    {tMeta, Id_m, Tvs_m, _, Mono_m} = get_meta(Env, Id_m),
+    {tMeta, Id_t, Tvs_t, Type_t, _} = get_meta(Env, Id_t),
+    Env_ = case Mono_m of
+        true -> set_meta(Env, Id_t, {tMeta, Id_t, Tvs_t, Type_t, true});
+        false -> Env
+    end,
     case Type_t of
-        null -> checkSolution(M, Type_t);
-        _    -> subset(Tvs_m, Tvs_t)
+        null -> checkSolution(Env_, M, Type_t);
+        _    -> {Env_, subset(Tvs_m, Tvs_t)}
     end;
-checkSolution(M, {tFun, Left, Right}) ->
-    checkSolution(M, Left) and checkSolution(M, Right);
-checkSolution(M, {tApp, Left, Right}) ->
-    checkSolution(M, Left) and checkSolution(M, Right);
-checkSolution({tMeta, _, _, _, Mono} = M, {tForall, _, Body}) ->
+checkSolution(Env, M, {tFun, Left, Right}) ->
+    {Env_, LRes} = checkSolution(Env, M, Left),
+    {Env__, RRes} = checkSolution(Env_, M, Right),
+    {Env__, LRes and RRes};
+checkSolution(Env, M, {tApp, Left, Right}) ->
+    {Env_, LRes} = checkSolution(Env, M, Left),
+    {Env__, RRes} = checkSolution(Env_, M, Right),
+    {Env__, LRes and RRes};
+checkSolution(Env, {tMeta, Id_m, _, _, _} = M, {tForall, _, Body}) ->
+    {tMeta, Id_m, _, _, Mono} = get_meta(Env, Id_m),
     case Mono of
-        true -> false;
-        false -> checkSolution(M, Body)
+        true -> {Env, false};
+        false -> checkSolution(Env, M, Body)
     end;
-checkSolution({tMeta, _, Tvs, _, _}, {tSkol, Id}) ->
-    lists:member(Id, Tvs);
-checkSolution(_M, _T) -> true.
+checkSolution(Env, {tMeta, Id_m, _, _, _}, {tSkol, Id}) ->
+    {tMeta, Id_m, Tvs, _, _} = get_meta(Env, Id_m),
+    {Env, lists:member(Id, Tvs)};
+checkSolution(Env, _M, _T) -> {Env, true}.
 
-unify(_Tvs, A, A) -> A;
-unify(_Tvs, {tVar, Name_A}, {tVar, Name_B}) when Name_A == Name_B ->
-    {tVar, Name_A};
-unify(Tvs, {tFun, Left_A, Right_A}, {tFun, Left_B, Right_B}) ->
-    Left_U = unify(Tvs, Left_A, Left_B),
-    Right_U = unify(Tvs, Right_A, Right_B),
-    {tFun, Left_U, Right_U};
-unify(Tvs, {tApp, Left_A, Right_A}, {tApp, Left_B, Right_B}) ->
-    Left_U = unify(Tvs, Left_A, Left_B),
-    Right_U = unify(Tvs, Right_A, Right_B),
-    {tApp, Left_U, Right_U};
-unify(Tvs, {tForall, Name_A, Body_A}=A, {tForall, Name_A, Body_A}=B) ->
+unify(Env, _Tvs, A, A) -> {Env, A};
+unify(Env, _Tvs, {tVar, Name_A}, {tVar, Name_B}) when Name_A == Name_B ->
+    {Env, {tVar, Name_A}};
+unify(Env, Tvs, {tFun, Left_A, Right_A}, {tFun, Left_B, Right_B}) ->
+    {Env_, Left_U} = unify(Env, Tvs, Left_A, Left_B),
+    {Env__, Right_U} = unify(Env_, Tvs, Right_A, Right_B),
+    {Env__, {tFun, Left_U, Right_U}};
+unify(Env, Tvs, {tApp, Left_A, Right_A}, {tApp, Left_B, Right_B}) ->
+    {Env_, Left_U} = unify(Env, Tvs, Left_A, Left_B),
+    {Env__, Right_U} = unify(Env_, Tvs, Right_A, Right_B),
+    {Env__, {tApp, Left_U, Right_U}};
+unify(Env, Tvs, {tForall, Name_A, Body_A}=A, {tForall, Name_A, Body_A}=B) ->
     Sk = freshTSkol(),
     {tSkol, SkId} = Sk,
-    unify([SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
-unify(Tvs, {tMeta, _, _, _, _} = A , B) ->
-    unifyTMeta(Tvs, A, B);
-unify(Tvs, A , {tMeta, _, _, _, _} = B) ->
-    unifyTMeta(Tvs, B, A);
-unify(_Tvs, A, B) ->
+    unify(Env, [SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
+unify(Env, Tvs, {tMeta, _, _, _, _} = A , B) ->
+    unifyTMeta(Env, Tvs, A, B);
+unify(Env, Tvs, A , {tMeta, _, _, _, _} = B) ->
+    unifyTMeta(Env, Tvs, B, A);
+unify(_Env, _Tvs, A, B) ->
     terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
 
 
-unifyTMeta(_Tvs, M, M) -> M;
-unifyTMeta(Tvs, {tMeta, _, _, Type, _}, T) when Type /= null ->
-    unify(Tvs, Type, T);
-unifyTMeta(Tvs, M, {tMeta, _, _, Type, _}) when Type /= null ->
-    unifyTMeta(Tvs, M, Type);
-unifyTMeta(Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
-    case checkSolution(M, T) of
-        true  -> {tMeta, Id, Tvs, T, Mono};
+unifyTMeta(Env, _Tvs, M, M) -> {Env, M};
+unifyTMeta(Env, Tvs, {tMeta, _, _, Type, _}, T) when Type /= null ->
+    unify(Env, Tvs, Type, T);
+unifyTMeta(Env, Tvs, M, {tMeta, _, _, Type, _}) when Type /= null ->
+    unifyTMeta(Env, Tvs, M, Type);
+unifyTMeta(Env, Tvs, {tMeta, Id, Tvs, _, Mono}=M, T) ->
+    {Env_, Res} = checkSolution(Env, M, T),
+    case Res of
+        true  ->
+            TM = {tMeta, Id, Tvs, T, Mono},
+            Env__ = set_meta(Env_, Id, TM),
+            {Env__, TM};
         false -> 
             terr("unifyTMeta failed: " ++ showType(M) ++ ":=" ++ showType(T))
 end.
 
-subsume(Tvs, A, {tForall, _, _}=B) -> 
+subsume(Env, Tvs, A, {tForall, _, _}=B) ->
     Sk = freshTSkol(),
     {tSkol, SkId} = Sk,
-    unify([SkId] ++ Tvs, A, openTForall(B, Sk));
-subsume(Tvs, {tForall, _, _}=A, B) ->
-    M = freshTMeta(Tvs),
-    unify(Tvs, openTForall(A, M), B);
-subsume(Tvs, A, B) -> unify(Tvs, A, B).
+    unify(Env, [SkId] ++ Tvs, A, openTForall(B, Sk));
+subsume(Env, Tvs, {tForall, _, _}=A, B) ->
+    {Env_, M} = freshTMeta(Env, Tvs),
+    unify(Env_, Tvs, openTForall(A, M), B);
+subsume(Env, Tvs, A, B) -> unify(Env, Tvs, A, B).
 
 % Inference/ Synthesis
 synth(Env, _Tvs, {var, Name}) ->
     case get_binding(Env, Name) of 
         not_found -> terr("undefined var : " ++  Name);
-        Ty -> Ty
+        Ty -> {Env, Ty}
     end;
 synth(Env, Tvs, {ann, Term, Type}) ->
-    check(Env, Tvs, Term, Type),
-    Type;
+    check(Env, Tvs, Term, Type);
 synth(Env, Tvs, {app, _Left, _Right}=Term) ->
     {FT, As} = flattenApp(Term),
-    Ty = synth(Env, Tvs, FT),
-    synthapps(Env, Tvs, Ty, As, null, []);
+    {Env_, Ty} = synth(Env, Tvs, FT),
+    synthapps(Env_, Tvs, Ty, As, null, []);
 synth(Env, Tvs, {abs, Name, Body}) ->
-    A = freshTMeta(Tvs, true),
-    B = freshTMeta(Tvs),
-    check(set_binding(Env, Name, A), Tvs, Body, B),
-    tFun(A, B);
+    {Env_1, A} = freshTMeta(Env, Tvs, true),
+    {Env_2, B} = freshTMeta(Env_1, Tvs),
+    {Env_3, _} = check(set_binding(Env_2, Name, A), Tvs, Body, B),
+    {Env_3, tFun(A, B)};
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
 
 synthapps(Env, Tvs, {tForall, _, _} = Ty, As, Ety, Acc) ->
-    M = freshTMeta(Tvs),
-    synthapps(Env, Tvs, openTForall(Ty, M), As, Ety, Acc);
+    {Env_, M}= freshTMeta(Env, Tvs),
+    synthapps(Env_, Tvs, openTForall(Ty, M), As, Ety, Acc);
 synthapps(Env, Tvs, {tFun, Left, Right}, As, Ety, Acc) when length(As) > 0 ->
     [TM | AsTail] = As,
     Acc_ = Acc ++ [{TM, Left}],
     synthapps(Env, Tvs, Right, AsTail, Ety, Acc_);
-synthapps(Env, Tvs, {tMeta, _Id, Tvs_m, Type, _}, As, Ety, Acc) when length(As) > 0 ->
+synthapps(Env, Tvs, {tMeta, Id_m, Tvs_m, Type, Mono}, As, Ety, Acc) when length(As) > 0 ->
     case Type of
         null  -> 
-        A = freshTMeta(Tvs_m),
-        B = freshTMeta(Tvs_m),
-        % ty.type = TFun(a, b),
-        %  BUG: Potential
-        Ty_Type = tFun(A, B),
-        [TM | AsTail] = As,
-        Acc_ = Acc ++ [{TM, A}],
-        synthapps(Env, Tvs, B, AsTail, Ety, Acc_);
+            {Env_, A}  = freshTMeta(Env, Tvs_m),
+            {Env__, B} = freshTMeta(Env_, Tvs_m),
+            % ty.type = TFun(a, b),
+            %  BUG: Potential
+            Ty_Type = tFun(A, B),
+            Env___ = set_meta(Env__, Id_m, {tMeta, Id_m, Tvs_m, Ty_Type, Mono}),
+            ?PRINT(Ty_Type),
+            [TM | AsTail] = As,
+            Acc_ = Acc ++ [{TM, A}],
+            synthapps(Env___, Tvs, B, AsTail, Ety, Acc_);
         Valid -> synthapps(Env, Tvs, Valid, As, Ety, Acc)
     end;
 synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
     terr("synthapps failed, not a function type: " ++ showType(Ty));
 synthapps(Env, Tvs, Ty, _As, Ety, Acc) ->
-    case Ety of
+    Env__ = case Ety of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
-        NotNull -> unify(Tvs, Ty, NotNull)
+        NotNull -> 
+            {Env_, _T} = unify(Env, Tvs, Ty, NotNull),
+            Env_
     end,
-    Ty.
+    {Env__, Ty}.
 
 % Bug to check
-pickAndCheckArgs(_, _, []) -> done;
+pickAndCheckArgs(Env, _, []) -> Env;
 pickAndCheckArgs(Env, Tvs, Acc) ->
     {{Tm, TmTy}, RestAcc} = pickArg(Acc),
-    check(Env, Tvs, Tm, TmTy),
-    pickAndCheckArgs(Env, Tvs, RestAcc).
+    {Env_, _T} = check(Env, Tvs, Tm, TmTy),
+    pickAndCheckArgs(Env_, Tvs, RestAcc).
 
 % Bug to check
 pickArg(Acc) -> pickArg_(Acc, []).
@@ -276,19 +301,20 @@ check(Env, Tvs, Term, {tForall, _, _} = Ty) ->
     {tSkol, SkId} = Sk,
     check(Env, [SkId] ++ Tvs, Term, openTForall(Ty, Sk));
 check(Env, Tvs, {abs, Name, Body}, {tFun, Left, Right}) ->
-    check(maps:put(Name, Left, Env), Tvs, Body, Right);
+    check(set_binding(Env, Name, Left), Tvs, Body, Right);
 check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
-    FTy = synth(Env, Tvs, FT),
-    synthapps(Env, Tvs, FTy, As, Ty, []);
+    {Env_, FTy} = synth(Env, Tvs, FT),
+    synthapps(Env_, Tvs, FTy, As, Ty, []);
 check(Env, Tvs, Term, Ty) ->
-    Inf  = synth(Env, Tvs, Term),
-    subsume(Tvs, Inf, Ty).
+    {Env_, Inf} = synth(Env, Tvs, Term),
+    subsume(Env_, Tvs, Inf, Ty).
 
 infer(Env, Term) ->
     % resetTMetaId();
     % resetTSkolId();
-    Ty = synth(Env, [], Term),
+    {Env_, Ty} = synth(Env, [], Term),
+    % ?PRINT(Env_),
     prune(Ty).
 
 %% ------------- Tests ------------%%
@@ -301,33 +327,33 @@ st(S, T) -> tApp(tApp(tv("ST"), S), T).
 pair(A, B) -> tApp(tApp(tv("Pair"), A), B).
 
 init_bindings() -> #{
-  "head" => tForall("t", tFun(listT(tv("t")), tv("t"))),
-  "tail" => tForall("t", tFun(listT(tv("t")), listT(tv("t")))),
-  "Nil" => tForall("t", listT(tv("t"))),
-  "Cons" => tForall("t", tFun(tv("t"), tFun(listT(tv("t")), listT(tv("t"))))),
-  "single" => tForall("t", tFun(tv("t"), listT(tv("t")))),
-  "append" => tForall("t", tFun(listT(tv("t")), tFun(listT(tv("t")), listT(tv("t"))))),
-  "length" => tForall("t", tFun(listT(tv("t")), tv("Int"))),
-  "runST" => tForall("t", tFun(tForall("s", st(tv("s"), tv("t"))), tv("t"))),
-  "argST" => tForall("s", st(tv("s"), tv("Int"))),
-  "pair" => tForall("a", tForall("b", tFun(tv("a"), tFun(tv("b"), pair(tv("a"), tv("b")))))),
-  "pair2" => tForall("b", tForall("a", tFun(tv("a"), tFun(tv("b"), pair(tv("a"), tv("b")))))),
-  "id" => tid(),
-  "ids" => listT(tid()),
-  "inc" => tFun(tv("Int"), tv("Int")),
-  "choose" => tForall("t", tFun(tv("t"), tFun(tv("t"), tv("t")))),
-  "poly" => tFun(tid(), pair(tv("Int"), tv("Bool"))),
-  "auto" => tFun(tid(), tid()),
-  "auto2" => tForall("b", tFun(tid(), tFun(tv("b"), tv("b")))),
-  "map" => tForall("a", tForall("b", tFun(tFun(tv("a"), tv("b")), tFun(listT(tv("a")), listT(tv("b")))))),
-  "app" => tForall("a", tForall("b", tFun(tFun(tv("a"), tv("b")), tFun(tv("a"), tv("b"))))),
-  "revapp" => tForall("a", tForall("b", tFun(tv("a"), tFun(tFun(tv("a"), tv("b")), tv("b"))))),
-  "f" => tForall("t", tFun(tFun(tv("t"), tv("t")), tFun(listT(tv("t")), tv("t")))),
-  "g" => tForall("t", tFun(listT(tv("t")), tFun(listT(tv("t")), tv("t")))),
-  "k" => tForall("t", tFun(tv("t"), tFun(listT(tv("t")), tv("t")))),
-  "h" => tFun(tv("Int"), tid()),
-  "l" => listT(tForall("t", tFun(tv("Int"), tFun(tv("t"), tv("t"))))),
-  "r" => tFun(tForall("a", tFun(tv("a"), tid())), tv("Int"))
+%   "head" => tForall("t", tFun(listT(tv("t")), tv("t"))),
+%   "tail" => tForall("t", tFun(listT(tv("t")), listT(tv("t")))),
+%   "Nil" => tForall("t", listT(tv("t"))),
+%   "Cons" => tForall("t", tFun(tv("t"), tFun(listT(tv("t")), listT(tv("t"))))),
+%   "single" => tForall("t", tFun(tv("t"), listT(tv("t")))),
+%   "append" => tForall("t", tFun(listT(tv("t")), tFun(listT(tv("t")), listT(tv("t"))))),
+%   "length" => tForall("t", tFun(listT(tv("t")), tv("Int"))),
+%   "runST" => tForall("t", tFun(tForall("s", st(tv("s"), tv("t"))), tv("t"))),
+%   "argST" => tForall("s", st(tv("s"), tv("Int"))),
+%   "pair" => tForall("a", tForall("b", tFun(tv("a"), tFun(tv("b"), pair(tv("a"), tv("b")))))),
+%   "pair2" => tForall("b", tForall("a", tFun(tv("a"), tFun(tv("b"), pair(tv("a"), tv("b")))))),
+  "id" => tid()
+%   "ids" => listT(tid()),
+%   "inc" => tFun(tv("Int"), tv("Int")),
+%   "choose" => tForall("t", tFun(tv("t"), tFun(tv("t"), tv("t")))),
+%   "poly" => tFun(tid(), pair(tv("Int"), tv("Bool"))),
+%   "auto" => tFun(tid(), tid()),
+%   "auto2" => tForall("b", tFun(tid(), tFun(tv("b"), tv("b")))),
+%   "map" => tForall("a", tForall("b", tFun(tFun(tv("a"), tv("b")), tFun(listT(tv("a")), listT(tv("b")))))),
+%   "app" => tForall("a", tForall("b", tFun(tFun(tv("a"), tv("b")), tFun(tv("a"), tv("b"))))),
+%   "revapp" => tForall("a", tForall("b", tFun(tv("a"), tFun(tFun(tv("a"), tv("b")), tv("b"))))),
+%   "f" => tForall("t", tFun(tFun(tv("t"), tv("t")), tFun(listT(tv("t")), tv("t")))),
+%   "g" => tForall("t", tFun(listT(tv("t")), tFun(listT(tv("t")), tv("t")))),
+%   "k" => tForall("t", tFun(tv("t"), tFun(listT(tv("t")), tv("t")))),
+%   "h" => tFun(tv("Int"), tid()),
+%   "l" => listT(tForall("t", tFun(tv("Int"), tFun(tv("t"), tv("t"))))),
+%   "r" => tFun(tForall("a", tFun(tv("a"), tid())), tv("Int"))
 }.
 
 init_env() -> #ten
@@ -394,6 +420,7 @@ tests_full_infer() ->
     % Test = maps:get(env(), "x", undefined),
     % ?PRINT(Test)
     % Term = abs("x", v("x")),
+    % Term = v("id"),
     Term = app(v("id"), v("id")),
     % Term = abs("x", abs("y", v("x"))),
     % Term = ann(app(v("choose"), v("id")), tFun(tid(), tid())),
