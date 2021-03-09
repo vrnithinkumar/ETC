@@ -408,7 +408,8 @@ test_cases() -> [
   %% D
   app(app(v("app"), v("poly")), v("id")),
   app(app(v("revapp"), v("id")), v("poly")),
-%   app(v("runST"), v("argST")),
+  %% TODO FIX
+  % app(v("runST"), v("argST")),
   app(app(v("app"), v("runST")), v("argST")),
   app(app(v("revapp"), v("argST")), v("runST")),
 
@@ -428,11 +429,12 @@ tests() ->
     ok.
 
 all_tests() ->
-lists:map(fun(Term) -> 
+    lists:map(fun(Term) -> 
         Ty = infer(init_env(), Term), 
         Res = showTerm(Term) ++ " :: " ++ showType(Ty),
         io:fwrite("Type Res: ~p ~n",[Res]) end, 
-    test_cases()).
+    test_cases()),
+    done.
 
 tests_full_infer() ->
     % Test = maps:get(env(), "x", undefined),
