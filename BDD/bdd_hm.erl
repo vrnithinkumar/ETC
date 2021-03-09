@@ -1,6 +1,6 @@
 -module(bdd_hm).
 
--export([tests/0, tests_full_infer/0]).
+-export([tests/0, tests_full_infer/0, all_tests/0]).
 
 % convert the js code in erlang
 
@@ -408,7 +408,7 @@ test_cases() -> [
   %% D
   app(app(v("app"), v("poly")), v("id")),
   app(app(v("revapp"), v("id")), v("poly")),
-  app(v("runST"), v("argST")),
+%   app(v("runST"), v("argST")),
   app(app(v("app"), v("runST")), v("argST")),
   app(app(v("revapp"), v("argST")), v("runST")),
 
@@ -426,6 +426,13 @@ tests() ->
     ANN_ = ann(ID_ABS, IDType),
     lists:map(fun(Term) -> showTerm(Term) end, [VAR_, ID_ABS, APP_, ANN_]),
     ok.
+
+all_tests() ->
+lists:map(fun(Term) -> 
+        Ty = infer(init_env(), Term), 
+        Res = showTerm(Term) ++ " :: " ++ showType(Ty),
+        io:fwrite("Type Res: ~p ~n",[Res]) end, 
+    test_cases()).
 
 tests_full_infer() ->
     % Test = maps:get(env(), "x", undefined),
