@@ -122,6 +122,16 @@ prune({tApp, Left, Right}) -> tApp(prune(Left), prune(Right));
 prune({tForall, Name, Body}) -> tForall(Name, prune(Body));
 prune(T) -> T.
 
+applyEnv(Env, {tMeta, Id, _, _, _}) ->
+    get_meta(Env, Id);
+applyEnv(Env, {tFun, Left, Right}) -> 
+    tFun(applyEnv(Env, Left), applyEnv(Env, Right));
+applyEnv(Env, {tApp, Left, Right}) -> 
+    tApp(applyEnv(Env, Left), applyEnv(Env, Right));
+applyEnv(Env, {tForall, Name, Body}) -> 
+    tForall(Name, applyEnv(Env, Body));
+applyEnv(_, T) -> T.
+
 flattenApp({app, Left, Right}) ->
     {T, Args} = flattenApp (Left),
     {T, Args ++ [Right]};
@@ -252,16 +262,15 @@ synthapps(Env, Tvs, {tFun, Left, Right}, As, Ety, Acc) when length(As) > 0 ->
 synthapps(Env, Tvs, {tMeta, Id_m, Tvs_m, Type, Mono}, As, Ety, Acc) when length(As) > 0 ->
     case Type of
         null  -> 
-            {Env_, A}  = freshTMeta(Env, Tvs_m),
-            {Env__, B} = freshTMeta(Env_, Tvs_m),
+            {Env_A, A}  = freshTMeta(Env, Tvs_m),
+            {Env_B, B} = freshTMeta(Env_A, Tvs_m),
             % ty.type = TFun(a, b),
             %  BUG: Potential
             Ty_Type = tFun(A, B),
-            Env___ = set_meta(Env__, Id_m, {tMeta, Id_m, Tvs_m, Ty_Type, Mono}),
-            ?PRINT(Ty_Type),
+            Env_ = set_meta(Env_B, Id_m, {tMeta, Id_m, Tvs_m, Ty_Type, Mono}),
             [TM | AsTail] = As,
             Acc_ = Acc ++ [{TM, A}],
-            synthapps(Env___, Tvs, B, AsTail, Ety, Acc_);
+            synthapps(Env_, Tvs, B, AsTail, Ety, Acc_);
         Valid -> synthapps(Env, Tvs, Valid, As, Ety, Acc)
     end;
 synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
@@ -311,11 +320,9 @@ check(Env, Tvs, Term, Ty) ->
     subsume(Env_, Tvs, Inf, Ty).
 
 infer(Env, Term) ->
-    % resetTMetaId();
-    % resetTSkolId();
     {Env_, Ty} = synth(Env, [], Term),
-    % ?PRINT(Env_),
-    prune(Ty).
+    TYY = applyEnv(Env_, Ty),
+    prune(TYY).
 
 %% ------------- Tests ------------%%
 % Helpers for testing
