@@ -8,6 +8,22 @@
 -ifndef(PRINT).
 -define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
 -endif.
+% Environment
+% Type checker Environment
+-record(ten, 
+{
+    bindings = #{},
+    metaMap  = #{}
+}).
+
+get_binding(Env, Ref) -> 
+    maps:get(Ref, Env#ten.bindings, not_found).
+set_binding(Env, Ref, Type) ->
+    Env#ten{bindings = maps:put(Ref, Type, Env#ten.bindings)}.
+get_Meta(Env, Ref) -> 
+    maps:get(Ref, Env#ten.metaMap, not_found).
+set_Meta(Env, Ref, Type) ->
+    Env#ten{metaMap = maps:put(Ref, Type, Env#ten.metaMap)}.
 
 % Terms
 var(Name)        -> {var, Name}.
@@ -186,7 +202,7 @@ subsume(Tvs, A, B) -> unify(Tvs, A, B).
 
 % Inference/ Synthesis
 synth(Env, _Tvs, {var, Name}) ->
-    case maps:get(Name, Env, not_found) of 
+    case get_binding(Env, Name) of 
         not_found -> terr("undefined var : " ++  Name);
         Ty -> Ty
     end;
@@ -200,7 +216,7 @@ synth(Env, Tvs, {app, _Left, _Right}=Term) ->
 synth(Env, Tvs, {abs, Name, Body}) ->
     A = freshTMeta(Tvs, true),
     B = freshTMeta(Tvs),
-    check(maps:put(Name, A, Env), Tvs, Body, B),
+    check(set_binding(Env, Name, A), Tvs, Body, B),
     tFun(A, B);
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
@@ -284,7 +300,7 @@ listT(T) -> tApp(tv("List"), T).
 st(S, T) -> tApp(tApp(tv("ST"), S), T).
 pair(A, B) -> tApp(tApp(tv("Pair"), A), B).
 
-env() -> #{
+init_bindings() -> #{
   "head" => tForall("t", tFun(listT(tv("t")), tv("t"))),
   "tail" => tForall("t", tFun(listT(tv("t")), listT(tv("t")))),
   "Nil" => tForall("t", listT(tv("t"))),
@@ -312,6 +328,12 @@ env() -> #{
   "h" => tFun(tv("Int"), tid()),
   "l" => listT(tForall("t", tFun(tv("Int"), tFun(tv("t"), tv("t"))))),
   "r" => tFun(tForall("a", tFun(tv("a"), tid())), tv("Int"))
+}.
+
+init_env() -> #ten
+{
+    bindings = init_bindings(),
+    metaMap = #{}
 }.
 
 test_cases() -> [
@@ -375,7 +397,7 @@ tests_full_infer() ->
     Term = app(v("id"), v("id")),
     % Term = abs("x", abs("y", v("x"))),
     % Term = ann(app(v("choose"), v("id")), tFun(tid(), tid())),
-    Ty = infer(env(), Term),
+    Ty = infer(init_env(), Term),
     % ?PRINT(Ty),
     Res = showTerm(Term) ++ " :: " ++ showType(Ty),
     io:fwrite("Type Res: ~p ~n",[Res]).
