@@ -265,7 +265,8 @@ synthapps(Env, Tvs, {tFun, Left, Right}, As, Ety, Acc) when length(As) > 0 ->
     [TM | AsTail] = As,
     Acc_ = Acc ++ [{TM, Left}],
     synthapps(Env, Tvs, Right, AsTail, Ety, Acc_);
-synthapps(Env, Tvs, {tMeta, Id_m, Tvs_m, Type, Mono}, As, Ety, Acc) when length(As) > 0 ->
+synthapps(Env, Tvs, {tMeta, Id_m, _, _, _}, As, Ety, Acc) when length(As) > 0 ->
+    {tMeta, Id_m, Tvs_m, Type, Mono} = get_meta(Env, Id_m),
     case Type of
         null  -> 
             {Env_A, A}  = freshTMeta(Env, Tvs_m),
@@ -309,8 +310,13 @@ pickArg_(Acc_Done, [{F,S} | Acc_Rem]) ->
         _ -> pickArg_(Acc_Done ++ [{F,S}], Acc_Rem)
     end.
 
-check(Env, Tvs, Term, {tMeta, _, _, Type, _}) when Type /= null->
-    check(Env, Tvs, Term, Type);
+check(Env, Tvs, Term, {tMeta, Id_m, _, _, _} = Ty) ->
+    {tMeta, Id_m, _, Type, _} = get_meta(Env, Id_m),
+    case Type of
+        null -> synthAndSubsume(Env, Tvs, Term, Ty);
+        ValidType -> check(Env, Tvs, Term, ValidType)
+    end;
+    
 check(Env, Tvs, Term, {tForall, _, _} = Ty) ->
     Sk = freshTSkol(),
     {tSkol, SkId} = Sk,
@@ -321,7 +327,9 @@ check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     {Env_, FTy} = synth(Env, Tvs, FT),
     synthapps(Env_, Tvs, FTy, As, Ty, []);
-check(Env, Tvs, Term, Ty) ->
+check(Env, Tvs, Term, Ty) -> synthAndSubsume(Env, Tvs, Term, Ty).
+
+synthAndSubsume(Env, Tvs, Term, Ty) ->
     {Env_, Inf} = synth(Env, Tvs, Term),
     subsume(Env_, Tvs, Inf, Ty).
 
@@ -410,7 +418,6 @@ test_cases() -> [
   %% D
   app(app(v("app"), v("poly")), v("id")),
   app(app(v("revapp"), v("id")), v("poly")),
-  %% TODO FIX
   app(v("runST"), v("argST")),
   app(app(v("app"), v("runST")), v("argST")),
   app(app(v("revapp"), v("argST")), v("runST")),
