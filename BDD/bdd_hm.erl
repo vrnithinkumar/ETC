@@ -118,14 +118,31 @@ showTerm({ann, Term, Type}) ->
     "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")";
 showTerm(Term) -> io_lib:format("Unknown term: ~p",[Term]).
 
-%% TODO Fix the update tM
-prune({tMeta, _Id, _Tvs, Type, _Mono}) when Type /= null ->
-    prune(Type);
-    % {tMeta, Id, Tvs, prune(Type), Mono};
-prune({tFun, Left, Right}) -> tFun(prune(Left), prune(Right));
-prune({tApp, Left, Right}) -> tApp(prune(Left), prune(Right));
-prune({tForall, Name, Body}) -> tForall(Name, prune(Body));
-prune(T) -> T.
+%% prune can modify the state of tMeta type.
+%% So passing Env to track.
+prune(Env, {tMeta, Id_m, _, _, _}) ->
+    {tMeta, Id_m, Tvs, Type, Mono} = get_meta(Env, Id_m),
+    case Type of 
+        null -> {Env, {tMeta, Id_m, Tvs, Type, Mono}};
+        Valid ->
+            {Env_1, PT} = prune(Env, Valid),
+            UpdatedMeta = {tMeta, Id_m, Tvs, PT, Mono},
+            Env_2 = set_meta(Env_1, Id_m, UpdatedMeta),
+            {Env_2, PT}
+            % {Env_2, UpdatedMeta}
+    end;
+prune(Env, {tFun, Left, Right}) ->
+    {Env_L, PT_L} = prune(Env, Left),
+    {Env_R, PT_R} = prune(Env_L, Right),
+    {Env_R, tFun(PT_L, PT_R)};
+prune(Env, {tApp, Left, Right}) ->
+    {Env_L, PT_L} = prune(Env, Left),
+    {Env_R, PT_R} = prune(Env_L, Right),
+    {Env_R, tApp(PT_L, PT_R)};
+prune(Env, {tForall, Name, Body}) ->
+    {Env_, PT} = prune(Env, Body),
+    {Env_, tForall(Name, PT)};
+prune(Env, T) -> {Env, T}.
 
 applyEnv(Env, {tMeta, Id, _, _, _}) ->
     get_meta(Env, Id);
@@ -295,20 +312,24 @@ synthapps(Env, Tvs, Ty, _As, Ety, Acc) ->
 % Bug to check
 pickAndCheckArgs(Env, _, []) -> Env;
 pickAndCheckArgs(Env, Tvs, Acc) ->
-    {{Tm, TmTy}, RestAcc} = pickArg(Acc),
-    {Env_, _T} = check(Env, Tvs, Tm, TmTy),
-    pickAndCheckArgs(Env_, Tvs, RestAcc).
+    {Env_1, {{Tm, TmTy}, RestAcc}} = pickArg(Env, Acc),
+    {Env_2, _T} = check(Env_1, Tvs, Tm, TmTy),
+    pickAndCheckArgs(Env_2, Tvs, RestAcc).
 
 % Bug to check
-pickArg(Acc) -> pickArg_(Acc, []).
-pickArg_(Acc_Done, []) ->
+pickArg(Env, Acc) ->
+    pickArg_(Env, [], Acc).
+pickArg_(Env, [Acc_HD | Acc_Rem], []) ->
     % Nothing match return shift
-    {hd(Acc_Done), tl(Acc_Done)};
-pickArg_(Acc_Done, [{F,S} | Acc_Rem]) ->
-    case S of
+    Res = {Acc_HD, Acc_Rem},
+    {Env, Res};
+pickArg_(Env, Acc_Done, [{F,S} | Acc_Rem]) ->
+    {Env_, PTS} = prune(Env, S),
+    case PTS of
         {tMeta, _, _, _, _} ->
-            {{F,S}, Acc_Done ++ Acc_Rem};
-        _ -> pickArg_(Acc_Done ++ [{F,S}], Acc_Rem)
+            pickArg_(Env_, Acc_Done ++ [{F,S}], Acc_Rem);
+        _ ->
+            {Env_, {{F,S}, Acc_Done ++ Acc_Rem}}
     end.
 
 check(Env, Tvs, Term, {tMeta, Id_m, _, _, _} = Ty) ->
@@ -337,7 +358,8 @@ synthAndSubsume(Env, Tvs, Term, Ty) ->
 infer(Env, Term) ->
     {Env_, Ty} = synth(Env, [], Term),
     TYY = applyEnv(Env_, Ty),
-    prune(TYY).
+    {_, PT} = prune(Env_, TYY),
+    PT.
 
 %% ------------- Tests ------------%%
 % Helpers for testing
