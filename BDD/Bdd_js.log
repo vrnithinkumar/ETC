@@ -1,0 +1,11 @@
+((choose Nil) ids) : (List (forall t. (t -> t)))
+((choose id) auto) : ((forall t. (t -> t)) -> (forall t. (t -> t)))
+((f (choose id)) ids) => TypeError: failed (?2[] -> ?2[]) ~ (forall t. (t -> t))
+((Cons id) ids) : (List (forall t. (t -> t)))
+((Cons (\x. x)) ids) : (List (forall t. (t -> t)))
+((append (single inc)) (single id)) : (List (Int -> Int))
+((g (single id)) ids) => TypeError: failed (?2[] -> ?2[]) ~ (forall t. (t -> t))
+((map head) (single ids)) : (List (forall t. (t -> t)))
+((revapp id) poly) : ((Pair Int) Bool)
+((revapp argST) runST) : Int
+((k (\x. (h x))) l) : (forall t. (Int -> (t -> t)))

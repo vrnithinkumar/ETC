@@ -118,7 +118,7 @@ showTerm({ann, Term, Type}) ->
     "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")";
 showTerm(Term) -> io_lib:format("Unknown term: ~p",[Term]).
 
-%% TODO Fix the update
+%% TODO Fix the update tM
 prune({tMeta, _Id, _Tvs, Type, _Mono}) when Type /= null ->
     prune(Type);
     % {tMeta, Id, Tvs, prune(Type), Mono};
