@@ -118,6 +118,7 @@ showTerm({ann, Term, Type}) ->
     "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")";
 showTerm(Term) -> io_lib:format("Unknown term: ~p",[Term]).
 
+%% TODO Fix the update
 prune({tMeta, _Id, _Tvs, Type, _Mono}) when Type /= null ->
     prune(Type);
     % {tMeta, Id, Tvs, prune(Type), Mono};
@@ -441,7 +442,7 @@ infer_term(Term) ->
     try
         Ty = infer(init_env(), Term), 
         Res = showTerm(Term) ++ " :: " ++ showType(Ty),
-        io:fwrite("~p ~n",[Res]) 
+        io:fwrite("~p ~n", [Res]) 
     catch
         error: Reason -> 
         MSG = showTerm(Term) ++ " :: " ++ Reason,
@@ -453,14 +454,9 @@ all_tests() ->
     done.
 
 tests_full_infer() ->
-    % Test = maps:get(env(), "x", undefined),
-    % ?PRINT(Test)
-    % Term = abs("x", v("x")),
-    % Term = v("id"),
-    % Term = app(v("id"), v("id")),
-    Term = abs("x", abs("y", v("x"))),
-    % Term = abs("x", abs("y", v("x"))),
-    % Term = ann(app(v("choose"), v("id")), tFun(tid(), tid())),
+    Term = app(app(v("choose"), v("Nil")), v("ids")),
+    % Term = app(v("choose"), v("Nil")), 
+    % Term = v("ids"),
     Ty = infer(init_env(), Term),
     % ?PRINT(Ty),
     Res = showTerm(Term) ++ " :: " ++ showType(Ty),
