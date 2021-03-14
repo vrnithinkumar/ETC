@@ -1,5 +1,1 @@
-"((f (choose id)) ids) :: (forall t. (t -> t))" 
-"((append (single inc)) (single id)) :: (List ?A)" 
-"((g (single id)) ids) :: (forall t. (t -> t))" 
-"((map head) (single ids)) :: (List ?A)" 
 [40,40,107,32,104,41,32,108,41,32,58,58,32|badarg] 

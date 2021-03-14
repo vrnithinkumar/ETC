@@ -303,9 +303,9 @@ synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
 synthapps(Env, Tvs, Ty, _As, Ety, Acc) ->
     Env__ = case Ety of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
-        NotNull -> 
+        NotNull ->
             {Env_, _T} = unify(Env, Tvs, Ty, NotNull),
-            Env_
+            pickAndCheckArgs(Env_, Tvs, Acc)
     end,
     {Env__, Ty}.
 
@@ -357,9 +357,11 @@ synthAndSubsume(Env, Tvs, Term, Ty) ->
 
 infer(Env, Term) ->
     {Env_, Ty} = synth(Env, [], Term),
-    TYY = applyEnv(Env_, Ty),
-    {_, PT} = prune(Env_, TYY),
-    PT.
+    Ty_ = applyEnv(Env_, Ty),
+    % ?PRINT(Ty_),
+    % ?PRINT(Env_#ten.metaMap),
+    {_, PTy} = prune(Env_, Ty_),
+    PTy.
 
 %% ------------- Tests ------------%%
 % Helpers for testing
@@ -476,7 +478,10 @@ all_tests() ->
     done.
 
 tests_full_infer() ->
-    Term = app(app(v("choose"), v("Nil")), v("ids")),
+    % Term = app(app(v("choose"), v("Nil")), v("ids")),
+    Term = app(app(v("f"), app(v("choose"), v("id"))), v("ids")), % X
+    % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
+    % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
     % Term = v("ids"),
     Ty = infer(init_env(), Term),
