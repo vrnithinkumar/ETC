@@ -39,6 +39,7 @@ ann(Term, Type)  -> {ann, Term, Type}.
 
 % Types
 tVar(Name)                 -> {tVar, Name}.
+builtIn(Name)              -> {bt, Name}.
 tForall(Name, Body)        -> {tForall, Name, Body}.
 tFun(Left, Right)          -> {tFun, Left, Right}.
 tApp(Left, Right)          -> {tApp, Left, Right}.
@@ -121,6 +122,7 @@ showType(Ty) ->
     TyStr.
 
 showType_({tVar, Name}, State) -> {Name, State};
+showType_({bt, Name}, State) -> {atom_to_list(Name), State};
 showType_({tMeta, Id, Tvs, Type, Mono}, State) ->
     % TODO
     % {tMeta, Id, Tvs, Type, Mono} = get_meta(Env, Id),
@@ -300,7 +302,7 @@ subsume(Env, Tvs, A, B) -> unify(Env, Tvs, A, B).
 
 % Inference/ Synthesis
 synth(Env, _Tvs, {const, bool}) ->
-    {Env, tVar("Bool")};
+    {Env, builtIn(bool)};
 synth(Env, _Tvs, {var, Name}) ->
     case get_binding(Env, Name) of 
         not_found -> terr("undefined var : " ++  Name);
