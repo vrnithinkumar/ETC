@@ -12,8 +12,9 @@
 % Type checker Environment
 -record(ten, 
 {
-    bindings = #{},
-    metaMap  = #{}
+    bindings      = #{},
+    metaMap       = #{}, % hack to store meta var state
+    typeVariables = []
 }).
 
 get_binding(Env, X) -> 
@@ -310,14 +311,14 @@ synth(Env, Tvs, {abs, Name, Body}) ->
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
 
-synthapps(Env, Tvs, {tForall, _, _} = Ty, As, Ety, Acc) ->
+synthapps(Env, Tvs, {tForall, _, _} = Ty, As, ExpectedType, Acc) ->
     {Env_, M}= freshTMeta(Env, Tvs),
-    synthapps(Env_, Tvs, openTForall(Ty, M), As, Ety, Acc);
-synthapps(Env, Tvs, {tFun, Left, Right}, As, Ety, Acc) when length(As) > 0 ->
+    synthapps(Env_, Tvs, openTForall(Ty, M), As, ExpectedType, Acc);
+synthapps(Env, Tvs, {tFun, Left, Right}, As, ExpectedType, Acc) when length(As) > 0 ->
     [TM | AsTail] = As,
     Acc_ = Acc ++ [{TM, Left}],
-    synthapps(Env, Tvs, Right, AsTail, Ety, Acc_);
-synthapps(Env, Tvs, {tMeta, Id_m, _, _, _}, As, Ety, Acc) when length(As) > 0 ->
+    synthapps(Env, Tvs, Right, AsTail, ExpectedType, Acc_);
+synthapps(Env, Tvs, {tMeta, Id_m, _, _, _}, As, ExpectedType, Acc) when length(As) > 0 ->
     {tMeta, Id_m, Tvs_m, Type, Mono} = get_meta(Env, Id_m),
     case Type of
         null  -> 
@@ -329,13 +330,13 @@ synthapps(Env, Tvs, {tMeta, Id_m, _, _, _}, As, Ety, Acc) when length(As) > 0 ->
             Env_ = set_meta(Env_B, Id_m, {tMeta, Id_m, Tvs_m, Ty_Type, Mono}),
             [TM | AsTail] = As,
             Acc_ = Acc ++ [{TM, A}],
-            synthapps(Env_, Tvs, B, AsTail, Ety, Acc_);
-        Valid -> synthapps(Env, Tvs, Valid, As, Ety, Acc)
+            synthapps(Env_, Tvs, B, AsTail, ExpectedType, Acc_);
+        Valid -> synthapps(Env, Tvs, Valid, As, ExpectedType, Acc)
     end;
 synthapps(_, _, Ty, As, _, _) when length(As) > 0 ->
     terr("synthapps failed, not a function type: " ++ showType(Ty));
-synthapps(Env, Tvs, Ty, _As, Ety, Acc) ->
-    Env__ = case Ety of
+synthapps(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
+    Env__ = case ExpectedType of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
         NotNull ->
             {Env_, _T} = unify(Env, Tvs, Ty, NotNull),
@@ -438,8 +439,9 @@ init_bindings() -> #{
 
 init_env() -> #ten
 {
-    bindings = init_bindings(),
-    metaMap = #{}
+    bindings      = init_bindings(),
+    metaMap       = #{},
+    typeVariables = []
 }.
 
 test_cases() -> [
