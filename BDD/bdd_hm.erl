@@ -1,6 +1,6 @@
 -module(bdd_hm).
 
--export([tests/0, tests_full_infer/0, all_tests/0]).
+-export([tests/0, tests_full_infer/0, all_tests/0, basic_tests/0]).
 
 % convert the js code in erlang
 
@@ -32,6 +32,7 @@ contains_tv(Env, TV) ->
 
 % Terms
 var(Name)        -> {var, Name}.
+c_bool()         -> {const, bool}.
 abs(Name, Body)  -> {abs, Name, Body}.
 app(Left, Right) -> {app, Left, Right}.
 ann(Term, Type)  -> {ann, Term, Type}.
@@ -155,7 +156,9 @@ showTerm({app, Left, Right}) ->
     "(" ++ showTerm(Left) ++ " " ++ showTerm(Right) ++ ")";
 showTerm({ann, Term, Type}) -> 
     "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")";
-showTerm(Term) -> io_lib:format("Unknown term: ~p",[Term]).
+showTerm({const, bool}) ->
+    "C(Bool)";
+showTerm(Term) -> "Cannot show Unknown term: " ++ showAny(Term).
 
 %% prune can modify the state of tMeta type.
 %% So passing Env to track.
@@ -296,6 +299,8 @@ subsume(Env, Tvs, {tForall, _, _}=A, B) ->
 subsume(Env, Tvs, A, B) -> unify(Env, Tvs, A, B).
 
 % Inference/ Synthesis
+synth(Env, _Tvs, {const, bool}) ->
+    {Env, tVar("Bool")};
 synth(Env, _Tvs, {var, Name}) ->
     case get_binding(Env, Name) of 
         not_found -> terr("undefined var : " ++  Name);
@@ -448,6 +453,15 @@ init_env() -> #ten
     typeVariables = []
 }.
 
+%% Random tests
+basic_test_cases() -> [
+  abs("x", v("id")), 
+  app(abs("x", v("x")), v("id")),
+  % Base bool case
+  c_bool(),
+  abs("x", c_bool())
+].
+
 test_cases() -> [
   %    A
   abs("x", abs("y", v("x"))),
@@ -455,7 +469,7 @@ test_cases() -> [
   ann(app(v("choose"), v("id")), tFun(tid(), tid())),
   app(app(v("choose"), v("Nil")), v("ids")),
   app(v("id"), v("auto")),
-  app(v("id"), v("auto2")),
+  app(v("id"), v("auto2")),  
   app(app(v("choose"), v("id")), v("auto")),
   app(app(v("choose"), v("id")), v("auto2")), % X
   app(app(v("f"), app(v("choose"), v("id"))), v("ids")), % X
@@ -517,14 +531,18 @@ all_tests() ->
     lists:map(fun(Term) -> infer_term(Term) end, test_cases()),
     done.
 
+basic_tests() ->
+    lists:map(fun(Term) -> infer_term(Term) end, basic_test_cases()),
+    done_basic_test.
+
 tests_full_infer() ->
     % Term = app(app(v("choose"), v("Nil")), v("ids")),
-    Term = app(app(v("k"), v("h")), v("l")), % X
+    % Term = app(app(v("k"), v("h")), v("l")), % X
+    Term = abs("x", c_bool()),
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
     % Term = v("ids"),
     Ty = infer(init_env(), Term),
-    % ?PRINT(Ty),
     Res = showTerm(Term) ++ " :: " ++ showType(Ty),
     io:fwrite("Type Res: ~p ~n",[Res]).
