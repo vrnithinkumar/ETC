@@ -14,7 +14,7 @@
 {
     bindings      = #{},
     metaMap       = #{}, % hack to store meta var state
-    typeVariables = []
+    typeVariables = [] % todo
 }).
 
 get_binding(Env, X) -> 
@@ -25,6 +25,10 @@ get_meta(Env, Id) ->
     maps:get(Id, Env#ten.metaMap, not_found).
 set_meta(Env, Id, Type) ->
     Env#ten{metaMap = maps:put(Id, Type, Env#ten.metaMap)}.
+append_tv(Env, TV) -> 
+    Env#ten{typeVariables = [TV] ++ Env#ten.typeVariables}.
+contains_tv(Env, TV) ->
+    lists:member(TV, Env#ten.typeVariables).
 
 % Terms
 var(Name)        -> {var, Name}.
