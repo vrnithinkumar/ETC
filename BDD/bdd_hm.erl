@@ -55,6 +55,10 @@ intToChar(Val) ->
     L = Val + 65,
     io_lib:format("~c", [L]).
 
+intToSmallChar(Val) ->
+    L = Val + 97,
+    io_lib:format("~c", [L]).
+
 % const resetTSkolId = () => { _tskolid = 0 };
 freshTSkol() -> tSkol(make_ref()).
 
@@ -72,14 +76,42 @@ subset([A|As], B) ->
     end;
 subset (_A, _B) -> true.
 
-mapAndNext({Next, Map}, Ref) ->
-    case maps:get(Ref, Map, not_found) of
-        not_found -> {intToChar(Next), {Next+1, maps:put(Ref, Next, Map)}};
-        Found -> {intToChar(Found), {Next, Map}}
+-record(meta,
+{
+    metaCount = 0,
+    skolCount = 0,
+    skolMap = #{},
+    metaMap  = #{}
+}).
+
+init_meta() -> #meta{}.
+
+mapAndNext(MetaState, Ref) ->
+    MM = MetaState#meta.metaMap,
+    case maps:get(Ref, MM, not_found) of
+        not_found ->
+            MC = MetaState#meta.metaCount,
+            {
+                intToChar(MC),
+                MetaState#meta{ metaCount = MC+1, metaMap = maps:put(Ref, MC, MM)}
+            };
+        Found -> {intToChar(Found), MetaState}
+    end.
+
+mapAndNextSkol(MetaState, Ref) ->
+    SM = MetaState#meta.skolMap,
+    case maps:get(Ref, SM, not_found) of
+        not_found ->
+            SC = MetaState#meta.skolCount,
+            {
+                intToSmallChar(SC),
+                MetaState#meta{ skolCount = SC+1, skolMap = maps:put(Ref, SC, SM)}
+            };
+        Found -> {intToSmallChar(Found), MetaState}
     end.
 
 showType(Ty) ->
-    {TyStr, _} = showType_(Ty, {0, #{}}),
+    {TyStr, _} = showType_(Ty, init_meta()),
     TyStr.
 
 showType_({tVar, Name}, State) -> {Name, State};
@@ -107,7 +139,9 @@ showType_({tApp, Left, Right}, State) ->
     {LStr, State_} = showType_(Left, State),
     {RStr, State__} = showType_(Right, State_),
     {"(" ++ LStr ++ " " ++ RStr ++ ")", State__};
-showType_({tSkol, Id}, State) -> {Id, State};
+showType_({tSkol, Id}, State) ->
+    {IdStr, State_} = mapAndNextSkol(State, Id),
+    {"'" ++ IdStr, State_};
 showType_(Ty, _) -> io_lib:format("Unknown type: ~p", [Ty]).
 
 showTerm({var, Name}) -> Name;
@@ -479,7 +513,7 @@ all_tests() ->
 
 tests_full_infer() ->
     % Term = app(app(v("choose"), v("Nil")), v("ids")),
-    Term = app(app(v("f"), app(v("choose"), v("id"))), v("ids")), % X
+    Term = app(app(v("k"), v("h")), v("l")), % X
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
