@@ -36,6 +36,7 @@ c_bool()         -> {const, bool}.
 abs(Name, Body)  -> {abs, Name, Body}.
 app(Left, Right) -> {app, Left, Right}.
 ann(Term, Type)  -> {ann, Term, Type}.
+func(FName, VName, Body) -> {func, FName, VName, Body}.
 
 % Types
 tVar(Name)                 -> {tVar, Name}.
@@ -154,6 +155,7 @@ showType_(Ty, _) -> io_lib:format("Unknown type: ~p", [Ty]).
 
 showTerm({var, Name}) -> Name;
 showTerm({abs, Name, Body}) -> "(\\" ++ Name ++ "." ++ showTerm(Body) ++ ")";
+showTerm({func, FName, _VName, _Body}) -> "(fun: " ++ FName ++ ")";
 showTerm({app, Left, Right}) ->
     "(" ++ showTerm(Left) ++ " " ++ showTerm(Right) ++ ")";
 showTerm({ann, Term, Type}) -> 
@@ -319,6 +321,13 @@ synth(Env, Tvs, {abs, Name, Body}) ->
     {Env_2, B} = freshTMeta(Env_1, Tvs),
     {Env_3, _} = check(set_binding(Env_2, Name, A), Tvs, Body, B),
     {Env_3, tFun(A, B)};
+synth(Env, Tvs, {func, FName, VName, Body}) ->
+    {Env_1, A} = freshTMeta(Env, Tvs, true),
+    {Env_2, B} = freshTMeta(Env_1, Tvs),
+    FT = tFun(A, B),
+    Env_3 = set_binding(Env_2, FName, FT),
+    {Env_4, _} = check(set_binding(Env_3, VName, A), Tvs, Body, B),
+    {Env_4, tFun(A, B)};
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
 
@@ -458,10 +467,12 @@ init_env() -> #ten
 %% Random tests
 basic_test_cases() -> [
   abs("x", v("id")), 
-  app(abs("x", v("x")), v("id")),
+  app(abs("x", v("x")), c_bool()),
   % Base bool case
   c_bool(),
-  abs("x", c_bool())
+  abs("x", c_bool()),
+  % Recursion
+  func("foo", "x", app(v("foo"), v("x")))
 ].
 
 test_cases() -> [
@@ -540,7 +551,9 @@ basic_tests() ->
 tests_full_infer() ->
     % Term = app(app(v("choose"), v("Nil")), v("ids")),
     % Term = app(app(v("k"), v("h")), v("l")), % X
-    Term = abs("x", c_bool()),
+    % Term = abs("x", c_bool()),
+    Term = func("foo", "x", app(v("foo"), v("x"))),
+    Term = func("foo", "x", app(v("foo"), v("x"))),
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
