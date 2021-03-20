@@ -37,6 +37,7 @@ abs(Name, Body)  -> {abs, Name, Body}.
 app(Left, Right) -> {app, Left, Right}.
 ann(Term, Type)  -> {ann, Term, Type}.
 func(FName, VName, Body) -> {func, FName, VName, Body}.
+if_else(Cond, TB, FB) -> {if_else, Cond, TB, FB}.
 
 % Types
 tVar(Name)                 -> {tVar, Name}.
@@ -47,6 +48,9 @@ tApp(Left, Right)          -> {tApp, Left, Right}.
 tMeta(Id, Tvs, Mono)       -> {tMeta, Id, Tvs, null, Mono}.
 % tMeta(Id, Tvs, Type, Mono) -> {tMeta, Id, Tvs, Type, Mono}.
 tSkol(Id)                  -> {tSkol, Id}.
+
+% Built In Types
+tBool() -> builtIn(bool).
 
 terr(Reason) -> erlang:error("Type Error: " ++ Reason).
 
@@ -67,7 +71,6 @@ intToSmallChar(Val) ->
     L = Val + 97,
     io_lib:format("~c", [L]).
 
-% const resetTSkolId = () => { _tskolid = 0 };
 freshTSkol() -> tSkol(make_ref()).
 
 freshTMeta(Env, Tvs, Mono) ->
@@ -162,6 +165,10 @@ showTerm({ann, Term, Type}) ->
     "(" ++ showTerm(Term) ++ " : " ++ showType(Type) ++ ")";
 showTerm({const, bool}) ->
     "C(Bool)";
+showTerm({if_else, Cond, TB, FB}) ->
+    "(" ++ showTerm(Cond) ++
+    " ? " ++  showTerm(TB) ++
+    " : " ++ showTerm(FB) ++ ")";
 showTerm(Term) -> "Cannot show Unknown term: " ++ showAny(Term).
 
 %% prune can modify the state of tMeta type.
@@ -304,7 +311,7 @@ subsume(Env, Tvs, A, B) -> unify(Env, Tvs, A, B).
 
 % Inference/ Synthesis
 synth(Env, _Tvs, {const, bool}) ->
-    {Env, builtIn(bool)};
+    {Env, tBool()};
 synth(Env, _Tvs, {var, Name}) ->
     case get_binding(Env, Name) of 
         not_found -> terr("undefined var : " ++  Name);
@@ -328,6 +335,12 @@ synth(Env, Tvs, {func, FName, VName, Body}) ->
     Env_3 = set_binding(Env_2, FName, FT),
     {Env_4, _} = check(set_binding(Env_3, VName, A), Tvs, Body, B),
     {Env_4, tFun(A, B)};
+synth(Env, Tvs, {if_else, Cond, TB, FB}) ->
+    {Env_1, A} = freshTMeta(Env, Tvs),
+    {Env_2, _} = check(Env_1, Tvs, Cond, tBool()),
+    {Env_3, _} = check(Env_2, Tvs, TB, A),
+    {Env_4, _} = check(Env_3, Tvs, FB, A),
+    {Env_4, A};
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showTerm(Term)).
 
@@ -472,7 +485,9 @@ basic_test_cases() -> [
   c_bool(),
   abs("x", c_bool()),
   % Recursion
-  func("foo", "x", app(v("foo"), v("x")))
+  func("foo", "x", app(v("foo"), v("x"))),
+  % IF Else case
+  if_else(c_bool(), c_bool(), c_bool())
 ].
 
 test_cases() -> [
@@ -552,8 +567,8 @@ tests_full_infer() ->
     % Term = app(app(v("choose"), v("Nil")), v("ids")),
     % Term = app(app(v("k"), v("h")), v("l")), % X
     % Term = abs("x", c_bool()),
-    Term = func("foo", "x", app(v("foo"), v("x"))),
-    Term = func("foo", "x", app(v("foo"), v("x"))),
+    % Term = func("foo", "x", app(v("foo"), v("x"))),
+    Term = if_else(c_bool(), c_bool(), c_bool()),
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
