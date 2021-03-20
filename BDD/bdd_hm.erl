@@ -417,6 +417,11 @@ check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     {Env_, FTy} = synth(Env, Tvs, FT),
     synthapps(Env_, Tvs, FTy, As, Ty, []);
+check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
+    {Env_1, _} = check(Env, Tvs, Cond, tBool()),
+    {Env_2, _} = check(Env_1, Tvs, TB, Ty),
+    {Env_3, _} = check(Env_2, Tvs, FB, Ty),
+    {Env_3, Ty};
 check(Env, Tvs, Term, Ty) -> synthAndSubsume(Env, Tvs, Term, Ty).
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
@@ -487,7 +492,8 @@ basic_test_cases() -> [
   % Recursion
   func("foo", "x", app(v("foo"), v("x"))),
   % IF Else case
-  if_else(c_bool(), c_bool(), c_bool())
+  if_else(c_bool(), c_bool(), c_bool()),
+  ann(if_else(c_bool(), c_bool(), c_bool()), tBool())
 ].
 
 test_cases() -> [
@@ -568,7 +574,8 @@ tests_full_infer() ->
     % Term = app(app(v("k"), v("h")), v("l")), % X
     % Term = abs("x", c_bool()),
     % Term = func("foo", "x", app(v("foo"), v("x"))),
-    Term = if_else(c_bool(), c_bool(), c_bool()),
+    % Term = if_else(c_bool(), c_bool(), c_bool()),
+    Term = ann(if_else(c_bool(), c_bool(), v("id")), tBool()),
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
