@@ -2,7 +2,7 @@
 
 ## BDD
 - [ ] Add if else
-  - [ ] Simple if case is support
+  - [X] Simple if case is support
   - [ ] Union type check / inference
 - [ ] Simple case structure
 - [ ] Let statements
@@ -10,5 +10,5 @@
 
 ## ETC
 - [ ] Integrate the BDD to ETC
-- [ ] 
+- [ ] Run the benchmark tests from ETC-HM
 - [ ] Run on antidote db
