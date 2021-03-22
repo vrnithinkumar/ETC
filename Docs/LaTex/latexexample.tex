@@ -1,0 +1,74 @@
+\documentclass[11pt]{article}
+
+\usepackage{mathpartir}
+
+% -- Semantics stuff
+%     I defined a couple of special commands (see examples in the text below) to make
+%     writing inference rules and judgements easier.
+\newcommand{\br}[1]{\langle #1 \rangle}
+\def\Yields{\Downarrow}
+
+% -- Page size
+\textheight     9.0truein
+\textwidth      6.5truein
+\topmargin     -0.5truein
+\oddsidemargin  +0.0truein
+\evensidemargin +0.0truein
+
+% -- Document title (appears at top)
+\title{COMP 105 Homework}
+\author{Samuel Z. Guyer}
+
+\begin{document}
+
+\maketitle
+
+% -- Example of a "heading": a bold title, not indented
+%     Any text inside the \textbf{} markup is rendered in bold
+\noindent
+\textbf{Exercise 1}
+
+% -- Regular paragraph
+
+Regular text paragraphs need  no special markup. Paragraphs are indented and word-wrapped automatically. 
+White space is not significant, but paragraphs are separated by any number of blank lines.
+
+% -- Formatting code
+%     The verbatim mode renders text in typewriter font and preserves every character, 
+%     including white space, exactly as you write it.
+\begin{verbatim}
+    int main(int argc, char * argv[])
+    {
+        printf("Hello, world\n");
+        return 0;
+    }
+\end{verbatim}
+
+% -- Mathematics
+%     Mathematical formulas are rendered in a special "math mode". For small formulas
+%     that you want embedded in other text, you enclose the formula in dollar signs. For
+%     larger formulas, like operational semantics inference rules, you can use the mathpar
+%     environment.  The \br command is defined in this document (at the top)
+
+An operational semantics judgement, like ${\br{e_1, \xi, \phi, \rho} \Yields \br{v_1, \xi, \phi, \rho'}}$, can be 
+embedded in a paragraph using dollar signs.
+
+To write a whole inference rule, use the mathpar markup. The inferrule markup has three parts:
+
+\begin{verbatim}
+\infferrule*[Right=formulaname]
+  { premises }
+  { conclusion }
+\end{verbatim}
+
+Here is an example:
+
+\begin{mathpar}
+\inferrule*[Right=\textsc{IfTrue}]
+  {\br{e_1, \xi, \phi, \rho} \Yields \br{v_1, \xi, \phi, \rho'}\\\\
+    v_1 \ne 0\\\\
+    \br{e_2, \xi, \phi, \rho'} \Yields \br{v_2, \xi, \phi, \rho''}\\ }
+  {\br{IF(e_1, e_2, e_3), \xi, \phi, \rho} \Yields \br{v_1, \xi, \phi, \rho''}}
+\end{mathpar}
+
+\end{document}

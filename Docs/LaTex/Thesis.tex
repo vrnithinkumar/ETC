@@ -1,0 +1,307 @@
+
+\documentclass{amsart}
+\usepackage{amsmath, amssymb}
+\usepackage{mathpartir, proof}
+\title{Erlang - Bidirectional Typing}
+
+\newcommand{\type}{\ensuremath{\mathtt{type}}}
+\newcommand{\application}{\Rightarrow\!\!\!\Rightarrow }
+\begin{document}
+\maketitle
+
+% \begin{abstract}
+% \end{abstract}
+
+\begin{section}{Eralng Syntax}
+\[
+\begin{array}{lcl}
+  fname & ::= & Atom / Integer \\
+  const & ::= & lit \mid [ const_1 \mid const_2 ] \mid \{ const_1, . . ., const_n \} \\
+  lit & ::= & Integer \mid Float \mid Atom \mid Char \mid String \mid [\ ] \\
+  fun & ::= & \textbf{fun} (var_1,..., var_n) \to exprs \\
+  var & ::= & VariableName \\
+  exprs &  ::= & expr \mid\ < expr_1,..., expr_n > \\
+  expr & ::=  & var \mid fname \mid lit \mid \textbf{fun} \\ 
+  & \mid & [ exprs_1 \mid exprs_2 ] \mid \{ exprs_1,..., exprs_n \} \\ 
+  & \mid & \textbf{let}\ vars = exprs_1\ \textbf{in}\ exprs_2 \\ 
+  & \mid & \textbf{case}\ exprs\ \textbf{of}\ clause_1\ ... clause_n\ \textbf{end} \\ 
+  & \mid & \textbf{letrec}\ fname_1\ = fun_1 ... fname_n = fun_n \textbf{in}\ exprs \\ 
+  & \mid & \textbf{apply}\ exprs_0(exprs_1,..., exprsn) \\ 
+  & \mid & \textbf{call}\ exprs_0\ 1:exprs_0 2(exprs_1,..., exprs_n) \\ 
+  & \mid & \textbf{primop}\ Atom(exprs_1,..., exprs_n) \\ 
+  & \mid & \textbf{receive}\ clause_1 ... clause_n\ after\ exprs_1 \to exprs_2 \\ 
+  & \mid & \textbf{try}\ exprs_1\ of\ <var_1, ...var_n> \to exprs_2\ \textbf{catch}\ <var_{n+1},...,var_{n+m}> \to exprs_3 \\ 
+  & \mid & \textbf{do}\ exprs_1\ exprs_2 \\ 
+  & \mid & \textbf{catch}\ exprs \\
+  vars & ::= & var \mid\ <var_1, . . ., var_n>\\
+  clause & ::= & pats\ \textbf{when}\ exprs_1 \to exprs_2\\
+  pats & ::= & pat \mid\ <pat_1, . . ., pat_n>\\
+  pat & ::= & var \mid lit \mid [ pat_1 \mid pat_2 ] \mid \{pat_1, . . ., pat_n\} \mid var = pat \\
+\end{array}
+\]
+\end{section}
+
+\begin{section}{Types and Syntax}
+\[
+\begin{array}{lcl}
+  Type & ::= & any()\\           
+  & \mid &  none()  \\              
+  & \mid & pid()\\
+  & \mid & port()\\
+  & \mid & reference()\\
+  & \mid & [\ ]       \\             
+  & \mid & Atom\\
+  & \mid & Bitstring\\
+  & \mid & float()\\
+  & \mid & Fun\\
+  & \mid & Integer\\
+  & \mid & List\\
+  & \mid & Map\\
+  & \mid & Tuple\\
+  & \mid & Union\\
+  & \mid & UserDefined \\
+\\
+  Atom & ::= & atom()\\
+  & \mid & Erlang\_Atom \\
+
+% Bitstring :: <<>>\\
+%              | <<_:M>>\\
+%              | <<_:_*N>>\\
+%              | <<_:M, _:_*N>>\\
+\\
+  Fun & ::= & fun()\\
+  & \mid & fun((...) \to Type)\\
+  & \mid & fun(() \to Type)\\
+  & \mid & fun((TList) \to Type)\\
+
+%   Integer :: integer()\\
+%           | Integer_Value\\
+%           | Integer_Value..Integer_Value\\
+
+%   Integer_Value :: Erlang_Integer              %% ..., -1, 0, 1, ... 42 ...
+%                  | Erlang_Character            %% $a, $b ...
+%                  | Integer_Value BinaryOp Integer_Value
+%                  | UnaryOp Integer_Value
+
+%   BinaryOp :: '*' | 'div' | 'rem' | 'band' | '+' | '-' | 'bor' | 'bxor' | 'bsl' | 'bsr'
+
+%   UnaryOp :: '+' | '-' | 'bnot'
+
+%   List :: list(Type)                           %% Proper list ([]-terminated)
+%         | maybe_improper_list(Type1, Type2)    %% Type1=contents, Type2=termination
+%         | nonempty_improper_list(Type1, Type2) %% Type1 and Type2 as above
+%         | nonempty_list(Type)                  %% Proper non-empty list
+\\
+  Map & ::= & \#\{\}       \\
+  & \mid & \#\{AssociationList\} \\
+\\
+  Tuple & ::= & tuple() \\
+  & \mid & \{\} \\ 
+  & \mid & \{TList\} \\
+
+%   AssociationList :: Association
+%                   | Association, AssociationList
+
+%   Association :: Type := Type                  %% denotes a mandatory association
+%               | Type => Type                  %% denotes an optional association
+
+%   TList :: Type
+%          | Type, TList
+\\
+  Union & ::=  & Type_1 \mid Type_2
+\end{array}
+\]  
+\end{section}  
+\newpage
+\begin{section}{Type Rules}
+\begin{subsection}{Constants}
+\begin{mathpar}
+  \inferrule[Const]{\quad}{\Gamma \vdash C \Rightarrow \type_c}\and
+\end{mathpar}
+Example:\\
+\begin{mathpar}
+  \inferrule[Int]{\quad}{\Gamma \vdash 0 \Rightarrow integer()}\and
+    \inferrule[Bool]{\quad}{\Gamma \vdash true \Rightarrow boolean()}\and
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Variables}
+\begin{mathpar}
+  \inferrule[Var]{(x : A) \in \Gamma}{\Gamma \vdash x \Rightarrow A}\and
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Annotation}
+\begin{mathpar}
+  \inferrule[Ann]{\Gamma \vdash x \Leftarrow A}{\Gamma \vdash (x: A) \Rightarrow A}\and
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Case}
+\begin{mathpar}
+  \inferrule[Case-Inf]{\Gamma \vdash e \Rightarrow (A_1 \mid A_2) \\
+            \Gamma, x_1 : A_1 \vdash e_1 \Rightarrow B_1 \\
+            \Gamma, x_2 : A_2 \vdash e_2 \Rightarrow B_2}
+            {\Gamma \vdash case(e,\ inj_1\ x_1.e_1,\ inj_2\ x_2.e_2) \Rightarrow (B_1 \mid B_2)} \and
+  \inferrule[Case-Check]{\Gamma \vdash e \Rightarrow (A_1 \mid A_2) \\
+            \Gamma, x_1 : A_1 \vdash e_1 \Leftarrow B_1 \\
+            \Gamma, x_2 : A_2 \vdash e_2 \Leftarrow B_2}
+            {\Gamma \vdash case(e,\ inj_1\ x_1.e_1,\ inj_2\ x_2.e_2) \Leftarrow (B_1 \mid B_2)}
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Clause}
+\begin{mathpar}
+  \inferrule[Clause-Check]{\Gamma, pat : A \vdash e \Leftarrow B}
+  {\Gamma \vdash clause(pat,\ e) \Leftarrow A \to B}\and
+
+  \inferrule[Clause-Inf*]{\Gamma \vdash pat \Rightarrow A \\
+  \Gamma, pat : A \vdash e \Rightarrow B}
+  {\Gamma \vdash clause(pat,\ e) \Rightarrow A \to B}\and
+\end{mathpar}
+\\
+\textit{*May have to use type variable and local constraint solver.}
+\end{subsection}
+
+\begin{subsection}{Function}
+\begin{mathpar}
+  \inferrule[Function-Check]{\Gamma \vdash x \Rightarrow (A_1 \mid A_2) \\
+            \Gamma, x : A_1 \vdash clause_1 \Leftarrow (A_1 \mid A_2) \to (B_1 \mid B_2) \\
+            \Gamma, x : A_2 \vdash clause_2 \Leftarrow (A_1 \mid A_2) \to (B_1 \mid B_2) }
+  {\Gamma \vdash fun(x, clause_1, clause_2) \Leftarrow (A_1 \mid A_2) \to (B_1 \mid B_2)}\and
+\end{mathpar}
+\begin{mathpar}
+  \inferrule[Function-Inf]{\Gamma \vdash x \Rightarrow (A_1 \mid A_2) \\
+            \Gamma, x : A_1 \vdash clause_1 \Rightarrow A_1 \to B_1 \\
+            \Gamma, x : A_2 \vdash clause_2 \Rightarrow A_2 \to B_2 }
+  {\Gamma \vdash fun(x, clause_1, clause_2) \Rightarrow (A_1 \to B_1) \mid (A_2 \to B_2)}\and
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Let}
+\begin{mathpar}
+  \inferrule[Let-Infer]{\Gamma \vdash e_1 \Rightarrow A\\
+  \Gamma, x : A \vdash e_2 \Rightarrow B}
+  {\Gamma \vdash let\ x = e_1\ in\ e_2 \Rightarrow B}\and
+\end{mathpar}
+\begin{mathpar}
+  \inferrule[Let-Check]{\Gamma \vdash e_1 \Rightarrow A\\
+  \Gamma, x : A \vdash e_2 \Leftarrow B}
+  {\Gamma \vdash let\ x = e_1\ in\ e_2 \Leftarrow B}\and
+\end{mathpar}
+\begin{mathpar}
+  \inferrule[Let-Check-Erl]{\Gamma \vdash e_1 \Rightarrow A\\
+  \Gamma, x : A \vdash e_2 \Leftarrow B}
+  {\Gamma \vdash x = e_1, e_2 \Leftarrow B}\and
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{If-Condition}
+\begin{mathpar}
+  \inferrule[IF-Cond]{\Gamma \vdash x_1 \Leftarrow Bool \\
+  \Gamma \vdash x_2 \Leftarrow Bool \\
+  \Gamma \vdash e_1 \Rightarrow B_1 \\
+  \Gamma \vdash e_2 \Rightarrow B_2
+  }
+  {\Gamma \vdash if(x_1 \to e_1, x_2 \to e_2) \Rightarrow (B_1 \mid B_2)}\and
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Subtyping}
+\begin{mathpar}
+  \inferrule[Sub]{\Gamma \vdash e \Rightarrow A \\
+  A <: B
+  }
+  {\Gamma \vdash e \Leftarrow B }
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Record}
+\end{subsection}
+
+\end{section}
+\newpage
+TODO: INSERT Algorithmic typing
+\newpage
+
+\begin{section}{Higher Rank Polymorphism}
+\begin{subsection}{Poly-Identity Application}
+
+(id: $\forall \alpha.\ \alpha \to \alpha$)
+
+\begin{mathpar}
+\inferrule*[Right=\textsc{$\forall$App}]
+{  
+    \inferrule*[Right=\textsc{$\to$App}]
+    {
+        \inferrule*[Right=\textsc{Sub}]
+        {   
+            \Gamma, \tau \vdash e \Rightarrow \tau \dashv \Theta \\
+            \inferrule*[Right=\textsc{<:InstantiateR}]
+            {   
+                %\hat{\alpha} \notin FV() \\
+                \inferrule*[Right=\textsc{<:InstaRSolve}]
+                {   
+                    \Gamma \vdash \tau
+                } 
+                {   
+                    \Gamma, \hat{\alpha} \vdash \hat{\alpha}  :\leqq \tau \dashv \Delta, \hat{\alpha} = \tau
+                }
+            } 
+            {   
+                \Theta \vdash \tau <: \hat{\alpha} \dashv \Delta, \hat{\alpha} = \tau
+            }
+        } 
+        {
+            \Gamma, \hat{\alpha} \vdash e \Leftarrow \hat{\alpha}  \dashv \Delta, \hat{\alpha} = \tau
+        }
+    }
+    {
+        \Gamma, \hat{\alpha} \vdash (\hat{\alpha} \to \hat{\alpha} )\ e \application \hat{\alpha}  \dashv \Delta, \hat{\alpha} = \tau
+    }
+}
+{
+\Gamma \vdash (\forall \alpha.\ \alpha \to \alpha)\ e \application \tau \dashv \Delta
+}
+\end{mathpar}
+\end{subsection}
+
+\begin{subsection}{Poly-Op}
+\begin{mathpar}
+  \inferrule*[Right=\textsc{$\forall$App}]
+  {
+    \inferrule
+    {
+        \Gamma, \hat{\alpha}, e_1:\hat{\alpha} \vdash e_1 \Rightarrow \tau  \dashv \Theta, \hat{\alpha} = \tau \\
+        \Theta , e_2:\hat{\alpha} \vdash e_2 \Leftarrow \tau \dashv \Delta, \hat{\alpha} = \tau
+    }
+    {
+        \Gamma, \hat{\alpha} \vdash ((\hat{\alpha} \to \hat{\alpha} \to \hat{\alpha}) e_1) e_2) \application \tau \dashv \Delta
+    }
+  }
+  {
+    \Gamma \vdash ((\forall \alpha.\ \alpha \to \alpha \to \alpha) e_1) e_2) \application \tau \dashv \Delta
+  }
+\end{mathpar}
+Op: $\forall \alpha.\ \alpha \to \alpha \to \alpha$
+\end{subsection}
+
+\end{section}
+\end{document}
+%   \inferrule[1b]{\Gamma \vdash \tau_1 : \type \\
+%              \Gamma \vdash \tau_1 : \type}
+%             {\Gamma \vdash \tau_1 \to \tau_2 : \type}\and
+%   \inferrule[1c]{\Gamma, \alpha : \type \vdash \tau : \type}
+%             {\Gamma \vdash \forall \alpha. \tau : \type}\and
+%   \inferrule[1d]{x : \tau \in \Gamma}{\Gamma \vdash x : \tau}\and
+%   \inferrule{\Gamma, x : \tau_1 \vdash e : \tau_2 \\
+%              \Gamma \vdash \tau : \type}
+%             {\Gamma \vdash \lambda x : \tau_1. e : \tau_1 \to \tau_2}\and
+%   \inferrule[1e]{\Gamma \vdash e_1 : \tau_1 \to \tau_2 \\
+%              \Gamma \vdash e_2 : \tau_2}
+%             {\Gamma \vdash e_1\ e_2 : \tau_2}\and
+%   \inferrule[1f]{\Gamma, \alpha : \type \vdash e : \tau}
+%             {\Gamma \vdash \Lambda \alpha. e : \forall \alpha. \tau}\and
+%   \inferrule[1g]{\Gamma \vdash e : \forall \alpha. \tau_2 \\
+%              \Gamma \vdash \tau_1 : \type}
+%             {\Gamma \vdash e[\tau_1] : [\tau_1/\alpha]\tau_2}\and

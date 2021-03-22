@@ -1,0 +1,290 @@
+\documentclass{article}
+
+% a bunch of useful packages.
+\usepackage[inference]{semantic}
+\usepackage{amsmath} \allowdisplaybreaks % lets align equations break over pages.
+\usepackage{hyperref}
+\usepackage[amsmath,hyperref,amsthm]{ntheorem}
+\usepackage{thmtools}
+\usepackage[capitalize]{cleveref}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{amssymb}
+\usepackage{latexsym}
+\usepackage{color}
+\usepackage[usenames,dvipsnames]{xcolor} % the best way to colour text
+\usepackage[colorinlistoftodos]{todonotes} 
+\usepackage{tikz} \usetikzlibrary{positioning,shadows,arrows,calc,backgrounds,fit,shapes,snakes,shapes.multipart,decorations.pathreplacing,shapes.misc,patterns}
+\usepackage{xspace}
+\usepackage{scalerel}
+\usepackage{bm} %bold math. a mess to use.
+\usepackage{bussproofs} % for logic-style proofs
+
+\hypersetup{ pdfpagemode=UseOutlines, colorlinks=true, linkcolor=red, citecolor=blue }
+
+% organise your code.
+\input{cmds}
+
+\title{
+	Typesetting $\lambda$-calculi with \LaTeX
+}
+\author{
+	Marco Patrignani
+}
+\date{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%							DOCUMENT						  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\maketitle
+
+This document contains a reference of the syntax and semantics for ULC and STLC.
+
+Syntax highlighting is nice way to guide you in visually separating each language; please inform me whether they cause any distraught.
+
+\begin{center}
+	\Large
+	Please read the latex comments too.
+\end{center}
+\tableofcontents
+
+\newpage
+
+\section{\ulc: Untyped Lambda Calculus}
+
+\subsection{Syntax}
+% all the stuff here is wrapped in \com{}, which is the macro i use to typeset stuff in italics, black.
+% removing that macro won't change anything visually (though if later on you want to typeset all ULC in, say, red, it's easier this way)
+% unless you want to typeset coloured stuff, do not care for \com{}, \src{} and \oth{} commands
+
+% \mid are vertical separators
+% the align* environment will align on &, which are put after the ::=, with an extra \ for space
+\begin{align*}
+	\com{t} \bnfdef&\
+		\com{n} \mid \com{\lam{x}{t}} \mid \com{x} \mid \com{t\ t} \mid \com{t \op t} % the \ is a single space
+	\\
+	\com{v} \bnfdef&\
+		\com{n} \mid \com{\lam{x}{t}}
+	\\
+	\com{\Omega} \bnfdef&\
+		\com{t} \mid \com{\fail}
+	\\
+	\com{\evalctx} \bnfdef&\
+		\com{\hole{\cdot}} \mid \com{\evalctx\ t} \mid \com{(\lam{x}{t})\ \evalctx} \mid \com{\evalctx \op t} \mid \com{n \op \evalctx}
+\end{align*}
+$\op$ ranges over $+, -, *$.
+
+\subsection{Structural Operational Semantics}
+
+\subsubsection{Small Step, Call by Value (SSV)}
+\begin{align*}
+	\com{\Omega\red\Omega} 
+	&&
+	\text{ judgement }
+\end{align*}
+Reductions.
+% inference rules are best put centered, with this environment
+\begin{center}
+	% this command is for generic inference rules. 
+	% the 4th parameter is the label, which gets referred as    tr:ssv-beta    in the first case, i.e., always add a   tr:   to what is between brackets
+	\typerule{SSV-Beta}{}{
+		\com{(\lam{x}{t})~v \red t\subst{v}{x}}
+	}{ssv-beta}
+	\typerule{SSV-Op}{}{
+		\com{n\op n' \red n\llbracket\op\rrbracket n'} 	% llbracket rrbracket should be made into a command. try it.
+	}{ssv-op}
+	\typerule{SSV-App1}{
+		\com{t_1\red t_1'}
+	}{
+		\com{t_1\ t_2 \red t_1' t_2}
+	}{ssv-app1}
+	\typerule{SSV-App2}{
+		\com{t_2\red t_2'}
+	}{
+		\com{(\lam{x}{t})\ t_2 \red (\lam{x}{t})\ t_2'}
+	}{ssv-app2}
+	\typerule{SSV-Op1}{
+		\com{t_1\red t_1'}
+	}{
+		\com{t_1\op t_2 \red t_1'\op t_2}
+	}{ssv-op1}
+	\typerule{SSV-Op2}{
+		\com{t_2\red t_2'}
+	}{
+		\com{n\op t_2 \red n\op t_2'}
+	}{ssv-op2}
+\end{center}
+Fail reductions.
+\begin{center}
+	\typerule{SSV-Op-fail-l}{}{
+		\com{(\lam{x}{t})\op t \red\fail}
+	}{ssv-f-opl}
+	\typerule{SSV-Op-fail-r}{}{
+		\com{n\ \op(\lam{x}{t}) \red\fail}
+	}{ssv-f-opr}
+	\typerule{SSV-App-fail-fun}{}{
+		\com{n\ t\red\fail}
+	}{ssv-f-fun}
+	\typerule{SSV-App-fail-arg}{
+		\com{t_2\red\fail}
+	}{
+		\com{(\lam{x}{t})\ t_2\red\fail}
+	}{ssv-f-arg}
+	\typerule{SSV-App-fail-1}{
+		\com{t_1\red\fail}
+	}{
+		\com{t_1\ t_2\red\fail}
+	}{ssv-f-app}
+	\typerule{SSV-Op-fail-1}{
+		\com{t_1\red\fail}
+	}{
+		\com{t_1\op t_2\red\fail}
+	}{ssv-f-op1}
+	\typerule{SSV-Op-fail-2}{
+		\com{t_2\red\fail}
+	}{
+		\com{n\op t_2\red\fail}
+	}{ssv-f-op2}
+\end{center}
+
+\subsubsection{Small Step, Call by Name (SSN)}
+Remove \Cref{tr:ssv-app2} and replace \Cref{tr:ssv-beta} with:
+\begin{center}
+	\typerule{SSN-Beta}{}{
+		\com{(\lam{x}{t})~t' \red t\subst{t'}{x}}
+	}{ssn-beta}
+\end{center}
+
+\subsubsection{Big Step, Call by Value (SBV)}
+\begin{align*}
+	\com{\Omega\bigs\Omega} 
+	&&
+	\text{ judgement }
+\end{align*}
+Reductions.
+Reductions for failing are omitted.
+\begin{center}
+	\typerule{SBV-val}{}{
+		\com{v \bigs v}
+	}{sbv-val}
+	\typerule{SBV-op}{
+		\com{t \bigs n }
+		&
+		\com{t' \bigs n'}
+	}{
+		\com{t \op t' \bigs n \llbracket \op \rrbracket n'}
+	}{sbv-op}
+	\typerule{SBV-app}{
+		\com{t \bigs \lam{x}{t''}}
+		&
+		\com{t' \bigs v}
+		&
+		\com{t''\subst{v}{x} \bigs v'}
+	}{
+		\com{t\ t' \bigs v'}
+	}{sbv-app}
+\end{center}
+
+\subsection{Contextual Operational Semantics, Call by Value (CSV)}
+\begin{align*}
+	\com{\Omega\cred\Omega} 
+	&&
+	\text{ judgement }
+	\\
+	\com{\Omega\credp\Omega} 
+	&&
+	\text{ judgement }
+\end{align*}
+Reductions.
+Reductions for failing are omitted.
+\begin{center}
+	\typerule{CSV-ctx}{
+		\com{t \credp t'}
+	}{
+		\com{\evalctx\hole{t} \cred \evalctx\hole{t'}}
+	}{csv-ctx}
+\end{center}
+Plus \Cref{tr:ssv-beta,tr:ssv-op}, changing $\red$ with $\credp$. 
+
+\section{\stlc: Simply-Typed Lambda Calculus}
+\subsection{Syntax}
+No changes save for program state.
+\begin{align*}
+	\src{\Omega} \bnfdef&\
+		\src{t}
+	\\
+	\src{\Gamma} \bnfdef&\
+		\srce \mid \src{\Gamma},(\src{x:\tau})
+	\\
+	\src{\tau} \bnfdef&\
+		\src{N} \mid \src{\tau\to\tau}
+\end{align*}
+
+\subsection{Static Semantics}
+\begin{align*}
+	\src{\Gamma}\vdash\src{t}:\src{\tau} 
+	&&
+	\text{ judgement }
+\end{align*}
+Reductions.
+\begin{center}
+	\typerule{Type-var}{
+		\src{x:\tau}\in\src{\Gamma}
+	}{
+		\src{\Gamma}\vdash\src{x}:\src{\tau}
+	}{t-stlc-var}
+	\typerule{Type-lam}{
+		\src{\Gamma},\src{x:\tau}\vdash\src{t}:\src{\tau'}
+	}{
+		\src{\Gamma}\vdash\src{\lam{x:\tau}{t}}:\src{\tau\to\tau'}
+	}{t-stlc-lam}
+	\typerule{Type-num}{
+	}{
+		\src{\Gamma}\vdash\src{n}:\src{N}
+	}{t-stlc-num}
+	\typerule{Type-app}{
+		\src{\Gamma}\vdash\src{t}:\src{\tau'\to\tau}
+		&
+		\src{\Gamma}\vdash\src{t'}:\src{\tau'}
+	}{
+		\src{\Gamma}\vdash\src{t\ t'}:\src{\tau}
+	}{t-stlc-app}
+	\typerule{Type-op}{
+		\src{\Gamma}\vdash\src{t}:\src{N}
+		&
+		\src{\Gamma}\vdash\src{t'}:\src{N}
+	}{
+		\src{\Gamma}\vdash\src{t\ t'}:\src{N}
+	}{t-stlc-op}
+\end{center}
+
+\subsection{Contextual Operational Semantics, Call by Value (CSV)}
+No changes, repeated for clarity.
+\begin{align*}
+	\src{\Omega\cred\Omega} 
+	&&
+	\text{ judgement }
+	\\
+	\src{\Omega\credp\Omega} 
+	&&
+	\text{ judgement }
+\end{align*}
+Reductions.
+No reductions for failing.
+\begin{center}
+	\typerule{CSV-ctx}{
+		\src{t \credp t'}
+	}{
+		\src{\evalctx\hole{t} \cred \evalctx\hole{t'}}
+	}{csv-stlc-ctx}
+	\typerule{CSV-Beta}{}{
+		\src{(\lam{x}{t})~v \credp t\subs{v}{x}}
+	}{ssv-stlc-beta}
+	\typerule{CSV-Op}{}{
+		\src{n\op n' \credp n\llbracket\op\rrbracket n'}
+	}{ssv-srlc-op}
+\end{center}
+
+\end{document}
