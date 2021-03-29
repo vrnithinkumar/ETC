@@ -12,3 +12,7 @@
 - [ ] Integrate the BDD to ETC
 - [ ] Run the benchmark tests from ETC-HM
 - [ ] Run on antidote db
+
+## Type Rules
+- [ ] Define Type rules for core erlang
+- [ ] Very basic using polymorphic bd type checking rules
