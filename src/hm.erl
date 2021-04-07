@@ -9,9 +9,9 @@
 -export([freshen/1,generalize/3,eqType/2,fresh/1, specialize/2]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
 -export([is_same/2, isSubType/2]).
+-export([has_type_var/1, is_type_var/1, type_without_bound/1]).
 -export([get_fn_args/1, get_fn_rt/1]).
 -export_type([constraint/0,type/0]).
-
 
 -type tvar() :: any().
 -type sub() :: maps:map(). % Map <tvar(),type()>
@@ -520,3 +520,19 @@ get_fn_args({funt, _, Args, _}) ->
     Args.
 get_fn_rt({funt, _, _, Ret}) ->
     Ret.
+
+% check if the type has any type variable.
+% only for forall now, may have to extend.
+-spec has_type_var(type()) -> boolean().
+has_type_var({forall, _, _, _}) -> true;
+has_type_var(_)                 -> false.
+
+-spec type_without_bound(type()) -> type().
+type_without_bound(T) ->
+    {ST, _} = stripbound(T),
+    ST.
+
+% check its a type var or not.
+-spec is_type_var(type()) -> boolean().
+is_type_var({tvar, _, _}) -> true;
+is_type_var(_)            -> false.

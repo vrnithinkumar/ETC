@@ -39,8 +39,14 @@ do_infer_type_check(Env, F, SpecFT) ->
     {hm:env(), boolean(), hm:type()}.
 check(Env, {integer,L,_}, Type) ->
     Inferred = hm:bt(integer, L),
-    IsSame = hm:isSubType(Inferred, Type),
-    {Env, IsSame, Inferred};
+    case hm:is_type_var(Type) of
+        true  ->
+            Env1 = env:extend_type_var(Type, Inferred, Env),
+            {Env1, true, Inferred};
+        false ->
+            IsSame = hm:isSubType(Inferred, Type),
+            {Env, IsSame, Inferred}
+    end;
 check(Env, {string, L,_}, Type) ->
     Inferred = hm:tcon("List", [hm:bt(char,L)],L),
     IsSame = hm:isSubType(Inferred, Type),
@@ -66,11 +72,11 @@ check(Env, {var, L, X}, Type) ->
     case env:is_bound(X,Env) of
         true  ->
             {VarT, _Ps} = etc:lookup(X, Env, L),
-            IsSame = hm:isSubType(VarT, Type),
-            {Env, IsSame, VarT};
+            check_type_var(Env, Type, VarT);
         false -> 
             VarT = hm:replaceLn(Type, L),
             Env_ = env:extend(X, VarT, Env),
+            % check_type_var(Env, Type, VarT),
             {Env_, true, VarT}
     end;
 check(Env,{match, L, _LNode, _RNode} = Node, Type) ->
@@ -81,21 +87,32 @@ check(Env,{match, L, _LNode, _RNode} = Node, Type) ->
     Ps = hm:subPs(InfPs,Sub),
     % predicate solving leads in a substitution since 
     % oc predicates are basically ambiguous unification constraints
-    {Sub_, RemPs}   = hm:solvePreds(rt:defaultClasses(), Ps),
+    {Sub_, RemPs} = hm:solvePreds(rt:defaultClasses(), Ps),
     SubdEnv = hm:subE(Env, hm:comp(Sub_, Sub)),
     {VarT, _Ps} = etc:lookup('X', SubdEnv, L),
     ?PRINT(VarT),
     {SubdEnv, true, Type};
 check(Env, {op, L, Op, E1, E2}, Type) ->
     OpType = lookup(Op, Env, L),
-    Arg1Type = hd(hm:get_fn_args(OpType)),
-    Arg2Type = lists:last(hm:get_fn_args(OpType)),
-    RetType = hm:get_fn_rt(OpType),
-    SpecType = hm:specialize(OpType, [Arg1Type, Arg2Type]),
-    {Env1, Res1, _T1} = check(Env, E1, Arg1Type),
-    {Env2, Res2, _T2} = check(Env1, E2, Arg2Type),
-    IsSame = hm:isSubType(RetType, Type),
-    {Env2, Res1 and IsSame and Res2, RetType};
+    case hm:has_type_var(OpType) of
+        true  ->
+            StrippedType = hm:type_without_bound(OpType),
+            Arg1Type = hd(hm:get_fn_args(StrippedType)),
+            Arg2Type = lists:last(hm:get_fn_args(StrippedType)),
+            {Env1, Res1, _T1} = check(Env, E1, Arg1Type),
+            {Env2, Res2, _T2} = check(Env1, E2, Arg2Type),
+            Env_Solved = env_solver:solve_envs(Env1, Env2),
+            {Env_Solved, true, Type};
+        false ->
+            Arg1Type = hd(hm:get_fn_args(OpType)),
+            Arg2Type = lists:last(hm:get_fn_args(OpType)),
+            RetType = hm:get_fn_rt(OpType),
+            {Env1, Res1, _T1} = check(Env, E1, Arg1Type),
+            {Env2, Res2, _T2} = check(Env1, E2, Arg2Type),
+            IsSame = hm:isSubType(RetType, Type),
+            {Env2, Res1 and IsSame and Res2, RetType}
+    end;
+
 check(Env, {clause,L,_,_,_}=Node, Type) ->
     ClausePatterns = clause_patterns(Node),
     ClauseBody = clause_body(Node),
@@ -206,3 +223,19 @@ lookupRemote(X,Env,L,Module) ->
             {FT,Ps} = hm:freshen(T), 
             {hm:replaceLn(FT,0,L),Ps}
     end.
+
+check_type_var(Env, Type, Inferred)->
+case hm:is_type_var(Type) of
+    true  ->
+        case env:lookup_type_var(Type, Env) of
+            VarType ->
+                IsSame = hm:isSubType(VarType, Inferred),
+                {Env, IsSame, Inferred};
+            undefined ->
+                Env1 = env:extend_type_var(Type, Inferred, Env),
+                {Env1, true, Inferred}
+        end;
+    false ->
+        IsSame = hm:isSubType(Inferred, Type),
+        {Env, IsSame, Inferred}
+end.
