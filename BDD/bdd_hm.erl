@@ -417,6 +417,11 @@ check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     {Env_, FTy} = synth(Env, Tvs, FT),
     synthapps(Env_, Tvs, FTy, As, Ty, []);
+check(Env, _Tvs, {const, bool} = Term, Ty) ->
+    case Ty of 
+        {bt, bool} -> {Env, Ty};
+         _ -> terr("Const bool does not have the type of " ++ showType(Ty))
+    end ;
 check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
     {Env_1, _} = check(Env, Tvs, Cond, tBool()),
     {Env_2, _} = check(Env_1, Tvs, TB, Ty),
@@ -425,6 +430,7 @@ check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
 check(Env, Tvs, Term, Ty) -> synthAndSubsume(Env, Tvs, Term, Ty).
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
+    % ?PRINT(Term),
     {Env_, Inf} = synth(Env, Tvs, Term),
     subsume(Env_, Tvs, Inf, Ty).
 
@@ -493,6 +499,7 @@ basic_test_cases() -> [
   func("foo", "x", app(v("foo"), v("x"))),
   % IF Else case
   if_else(c_bool(), c_bool(), c_bool()),
+  ann(c_bool(), tBool()),
   ann(if_else(c_bool(), c_bool(), c_bool()), tBool())
 ].
 
@@ -575,7 +582,8 @@ tests_full_infer() ->
     % Term = abs("x", c_bool()),
     % Term = func("foo", "x", app(v("foo"), v("x"))),
     % Term = if_else(c_bool(), c_bool(), c_bool()),
-    Term = ann(if_else(c_bool(), c_bool(), v("id")), tBool()),
+    % Term = ann(if_else(c_bool(), c_bool(), v("id")), tBool()),
+    Term = ann(c_bool(), tBool()),
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
     % Term = app(v("choose"), v("Nil")), 
