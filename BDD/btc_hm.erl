@@ -1,4 +1,4 @@
--module(bdd_hm).
+-module(btc_hm).
 
 -export([tests/0, tests_full_infer/0, all_tests/0, basic_tests/0]).
 
