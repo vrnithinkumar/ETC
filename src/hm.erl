@@ -39,9 +39,9 @@
 % L is line/length
 bt (A,L)          -> {bt, L, A}. % A arguments , B is return type
 funt (A,B,L)      -> {funt, L, A, B}. % A arguments , B is return type
-tvar (A,L)        -> {tvar, L, A}.
-tcon(N,A,L)       -> {tcon, L, N, A}.
-forall (X,P,A,L)  -> {forall, tvar(X,L), P, A}.
+tvar (A,L)        -> {tvar, L, A}. % L = Line, A : Name of the variable
+tcon(N,A,L)       -> {tcon, L, N, A}. % Name of the constructor A: args
+forall (X,P,A,L)  -> {forall, tvar(X,L), P, A}. %P for predicates
 
 %%%%%%%%%%%% Constraint solver
 
