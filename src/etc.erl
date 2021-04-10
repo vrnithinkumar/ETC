@@ -111,7 +111,7 @@ parse_transform_stdlib(Forms) ->
     SpecTypes = getSpecWithAllFuns(Specs),
     % add UDTs to default env
     env:dumpModuleSpecs(SpecTypes, Module),
-    io:fwrite("Library Module:- ~p ~n",[Module]), 
+    io:fwrite("Library Module:- ~p ~n",[Module]),
     lists:map(fun({X,T}) -> 
         io:fwrite("  ~p :: ",[X]),
         [Head | _Tail] = T ,
@@ -168,11 +168,11 @@ inferOrCheck(Env, F, {AccCs, AccPs}) ->
             { unify(T, FreshT) ++ Cs ++ AccCs
             , Ps ++ AccPs};
         true -> 
-            tc:type_check(Env, F),
+            btc:type_check(Env, F),
             {AccCs, AccPs}
     end.
 
--spec infer(hm:env(), erl_syntax:syntaxTree()) -> 
+-spec infer(hm:env(), erl_syntax:syntaxTree()) ->
     {hm:type(),[hm:constraint()],[hm:predicate()]}.
 infer(_,{integer,L,_}) -> 
     X = hm:fresh(L),
@@ -182,8 +182,8 @@ infer(_, {string,L,_}) ->
 infer(_,{char,L,_}) ->
     {hm:bt(char,L),[],[]};
 infer(_,{float,L,_}) ->
-    {hm:bt(float,L),[],[]}; 
-infer(Env,{clause,L,_,_,_}=Node) ->       
+    {hm:bt(float,L),[],[]};
+infer(Env,{clause,L,_,_,_}=Node) ->
     ClausePatterns = clause_patterns(Node),
     % ?PRINT(ClausePatterns),
     % Infer types of arguments (which are in the form of patterns)
@@ -195,7 +195,7 @@ infer(Env,{clause,L,_,_,_}=Node) ->
     % ?PRINT(PsGaurds),
     {ReturnType, CsBody, PsBody} = inferClauseBody(Env_,clause_body(Node)),
     {hm:funt(ArgTypes,ReturnType,L)
-    , CsArgs ++ CsGaurds ++ CsBody 
+    , CsArgs ++ CsGaurds ++ CsBody
     , PsArgs ++ PsGaurds ++ PsBody};
 infer(_,{var,L,'_'}) ->
     {hm:fresh(L),[],[]};
@@ -238,7 +238,7 @@ infer(Env,{op,L,Op,E1,E2}) ->
     {V, Cs1 ++ Cs2 ++ unify(T, hm:funt([T1,T2],V,L)), Ps ++ Ps1 ++ Ps2};
 infer(Env,{atom,L,X}) ->
     case X of
-        B when is_boolean(B) -> 
+        B when is_boolean(B) ->
             {hm:bt(boolean,L),[],[]};
         _ -> 
             % lookup if atom is a nullary constructor
@@ -265,7 +265,7 @@ infer(Env,{cons,L,H,T}) ->
     , HPs ++ TPs};
 infer(Env,{tuple,L,Es}) ->
     % lazy treatement of tuple as a tuple (not constructor)
-    TupleTyping = fun() ->  
+    TupleTyping = fun() ->
         {Ts,Cs,Ps} = lists:foldl(
                         fun(X, {AccT,AccCs,AccPs}) -> 
                             {T,Cs,Ps} = infer(Env,X),
@@ -338,10 +338,10 @@ infer(Env,{record,L,Rec,FieldValues}) ->
     {ArgTs, ArgCs, ArgPs} = lists:foldr(fun({F,ExpectedType},{AccTs,AccCs,AccPs}) ->
         Field = getField(F),
         GivenValue = getRecFieldValue(Field,FieldValues),
-        {InfT,InfCs,InfPs} = 
+        {InfT,InfCs,InfPs} =
             case GivenValue of
                 % value not given
-                {nothing}   -> 
+                {nothing}   ->
                     case getDefaultValue(F) of
                         % no default value, no given type
                         {nothing}   -> 
