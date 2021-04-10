@@ -1,6 +1,6 @@
 # TODO
 
-## BDD
+## BDTC
 - [ ] Add if else
   - [X] Simple if case is support
   - [ ] Union type check / inference
@@ -9,7 +9,8 @@
 - [ ] Union type support
 
 ## ETC
-- [ ] Integrate the BDD to ETC
+- [X] Integrate the BDTC to ETC
+  - [ ] Simple erlang function
 - [ ] Run the benchmark tests from ETC-HM
 - [ ] Run on antidote db
 
