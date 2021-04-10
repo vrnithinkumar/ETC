@@ -9,7 +9,6 @@
     type/1
 ]).
 
--export([tests_full_infer/0, all_tests/0]).
 -export([type_check/2]).
 
 %% PRINT Debugging macro%%
@@ -20,42 +19,7 @@
 %% BDTC - Start %%
 
 % Helpers for testing
-v(N) -> var(N).
-tv(N) -> hm:tvar(N, 0).
-tid() -> hm:forall("t", [], hm:funt([tv("t")], tv("t"), 0), 0).
-listT(T) -> hm:tcon("List", [T], 0).
-st(S, T) -> hm:tcon(hm:tcon("ST", [S], 0), [T], 0).
-pair(A, B) -> hm:tcon(hm:tcon("Pair", [A], 0), [B], 0).
 
-init_bindings() -> #{
-"head" => hm:forall("t", [], hm:funt([listT(tv("t"))], tv("t"), 0), 0),
-"tail" => hm:forall("t", [], hm:funt([listT(tv("t"))], listT(tv("t")), 0), 0),
-"Nil" => hm:forall("t", [], listT(tv("t")), 0),
-"Cons" => hm:forall("t", [], hm:funt([tv("t")], hm:funt([listT(tv("t"))], listT(tv("t")), 0), 0), 0),
-"single" => hm:forall("t", [], hm:funt([tv("t")], listT(tv("t")), 0), 0),
-"append" => hm:forall("t", [], hm:funt([listT(tv("t"))], hm:funt([listT(tv("t"))], listT(tv("t")), 0), 0), 0),
-"length" => hm:forall("t", [], hm:funt([listT(tv("t"))], tInt(), 0), 0),
-"runST" => hm:forall("t", [], hm:funt([hm:forall("s", [], st(tv("s"), tv("t")), 0)], tv("t"), 0), 0),
-"argST" => hm:forall("s", [], st(tv("s"), tInt()), 0),
-"pair" => hm:forall("a", [], hm:forall("b", [], hm:funt([tv("a")], hm:funt([tv("b")], pair(tv("a"), tv("b")), 0), 0), 0), 0),
-"pair2" => hm:forall("b", [], hm:forall("a", [], hm:funt([tv("a")], hm:funt([tv("b")], pair(tv("a"), tv("b")), 0), 0), 0), 0),
-"id" => tid(),
-"ids" => listT(tid()),
-"inc" => hm:funt([tInt()], tInt(), 0),
-"choose" => hm:forall("t", [], hm:funt([tv("t")], hm:funt([tv("t")], tv("t"), 0), 0), 0),
-"poly" => hm:funt([tid()], pair(tInt(), tBool()), 0),
-"auto" => hm:funt([tid()], tid(), 0),
-"auto2" => hm:forall("b", [], hm:funt([tid()], hm:funt([tv("b")], tv("b"), 0), 0), 0),
-"map" => hm:forall("a", [], hm:forall("b", [], hm:funt([hm:funt([tv("a")], tv("b"), 0)], hm:funt([listT(tv("a"))], listT(tv("b")), 0), 0), 0), 0),
-"app" => hm:forall("a", [], hm:forall("b", [], hm:funt([hm:funt([tv("a")], tv("b"), 0)], hm:funt([tv("a")], tv("b"), 0), 0), 0), 0),
-"revapp" => hm:forall("a", [], hm:forall("b", [], hm:funt([tv("a")], hm:funt([hm:funt([tv("a")], tv("b"), 0)], tv("b"), 0), 0), 0) , 0),
-"f" => hm:forall("t", [], hm:funt([hm:funt([tv("t")], tv("t"), 0)], hm:funt([listT(tv("t"))], tv("t"), 0), 0), 0),
-"g" => hm:forall("t", [], hm:funt([listT(tv("t"))], hm:funt([listT(tv("t"))], tv("t"), 0), 0), 0),
-"k" => hm:forall("t", [], hm:funt([tv("t")], hm:funt([listT(tv("t"))], tv("t"), 0), 0), 0),
-"h" => hm:funt([tInt()], tid(), 0),
-"l" => listT(hm:forall("t", [], hm:funt([tInt()], hm:funt([tv("t")], tv("t"), 0), 0), 0)),
-"r" => hm:funt([hm:forall("a", [], hm:funt([tv("a")], tid(), 0), 0)], tInt(), 0)
-}.
 
 % Built In Types
 tBool() -> hm:bt(bool, 0).
@@ -87,77 +51,12 @@ subset([A|As], B) ->
     end;
 subset (_A, _B) -> true.
 
--record(meta,
-{
-    metaCount = 0,
-    skolCount = 0,
-    skolMap = #{},
-    metaMap  = #{}
-}).
-
-init_meta() -> #meta{}.
-
-mapAndNext(MetaState, Ref) ->
-    MM = MetaState#meta.metaMap,
-    case maps:get(Ref, MM, not_found) of
-        not_found ->
-            MC = MetaState#meta.metaCount,
-            {
-                intToChar(MC),
-                MetaState#meta{ metaCount = MC+1, metaMap = maps:put(Ref, MC, MM)}
-            };
-        Found -> {intToChar(Found), MetaState}
-    end.
-
-mapAndNextSkol(MetaState, Ref) ->
-    SM = MetaState#meta.skolMap,
-    case maps:get(Ref, SM, not_found) of
-        not_found ->
-            SC = MetaState#meta.skolCount,
-            {
-                intToSmallChar(SC),
-                MetaState#meta{ skolCount = SC+1, skolMap = maps:put(Ref, SC, SM)}
-            };
-        Found -> {intToSmallChar(Found), MetaState}
-    end.
-
 showType(Ty) ->
     Res = hm:pretty(Ty). %,
     % " ".
     % ?PRINT(Ty),
     % {TyStr, _} = showType_(Ty, init_meta()),
     % TyStr.
-
-showType_({tVar, Name}, State) -> {Name, State};
-showType_({bt, Name}, State) -> {atom_to_list(Name), State};
-showType_({tMeta, Id, Tvs, Type, Mono}, State) ->
-    % TODO
-    % {tMeta, Id, Tvs, Type, Mono} = get_meta(Env, Id),
-    MonoStr = case Mono of
-        true  -> "`";
-        false -> ""
-    end,
-    {TypeStr, State_} = case Type of
-        null  -> {"", State};
-        Valid -> showType_(Valid, State)
-    end,
-    {IdStr, State__} = mapAndNext(State_, Id),
-    {"?" ++ MonoStr ++ IdStr ++ showList(Tvs) ++ TypeStr, State__};
-showType_({tForall, Name, Body}, State) ->
-    {BdStr, State_} = showType_(Body, State),
-    {"(forall " ++ Name ++ ". " ++ BdStr ++ ")", State_};
-showType_({funt, Left, Right}, State) ->
-    {LStr, State_} = showType_(Left, State),
-    {RStr, State__} = showType_(Right, State_),
-    {"(" ++ LStr ++ " -> " ++ RStr ++ ")", State__};
-showType_({tApp, Left, Right}, State) ->
-    {LStr, State_} = showType_(Left, State),
-    {RStr, State__} = showType_(Right, State_),
-    {"(" ++ LStr ++ " " ++ RStr ++ ")", State__};
-showType_({tSkol, Id}, State) ->
-    {IdStr, State_} = mapAndNextSkol(State, Id),
-    {"'" ++ IdStr, State_};
-showType_(Ty, _) -> io_lib:format("Unknown type: ~p", [Ty]).
 
 %% prune can modify the state of tMeta type.
 %% So passing Env to track.
@@ -436,41 +335,6 @@ infer(Env, Term) ->
     {_, PTy} = prune(Env_, Ty_),
     PTy.
 
-init_btc_env()->
-    maps:fold(
-        fun(X, T, Env) -> env:extend(X, T, Env) end,
-        env:empty(),
-        init_bindings()).
-
-tests_full_infer() ->
-    % Term = app(app(v("choose"), v("Nil")), v("ids")),
-    Term = app(app(v("revapp"), v("argST")), v("runST")),
-    % Term = abs("x", c_bool()),
-    % Term = func("foo", "x", app(v("foo"), v("x"))),
-    % Term = if_else(c_bool(), c_bool(), c_bool()),
-    % Term = ann(if_else(c_bool(), c_bool(), v("id")), tBool()),
-    % Term = ann(c_bool(), tBool()),
-    % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
-    % Term = app(v("choose"), v("id")) ,% X
-    % Term = app(app(v("choose"), v("id")), v("auto2")),
-    % Term = app(app(v("k"), v("h")), v("l")), %% X
-    % Term = app(v("choose"), v("Nil")),
-    % Term = v("choose"),
-    % Term = v("Nil"),
-    % Term = v("id"),
-    % Term = v("ids"),
-    % Term = v("k"),
-    % Term = v("h"),
-    % Term = v("l"),
-    Ty = infer(init_btc_env(), Term),
-    ?PRINT(Ty),
-    io:fwrite("Type Res: ",[]),
-    showTerm(Term),
-    io:fwrite(" :: ",[]),
-    showType(Ty),
-    io:fwrite("~n",[]),
-    okie.
-
 % Terms
 var(Name)        -> {var, Name}.
 c_bool()         -> {const, bool}.
@@ -480,99 +344,6 @@ ann(Term, Type)  -> {ann, Term, Type}.
 func(FName, VName, Body) -> {func, FName, VName, Body}.
 if_else(Cond, TB, FB) -> {if_else, Cond, TB, FB}.
 
-showTerm({var, Name}) ->  io:fwrite("~s",[Name]) ;
-showTerm({abs, Name, Body}) ->
-    io:fwrite("(\\~s.",[Name]),
-    showTerm(Body),
-    io:fwrite(")");
-showTerm({func, FName, _VName, _Body}) ->
-    io:fwrite("(fun: ~p)", [FName]);
-showTerm({app, Left, Right}) ->
-    io:fwrite("(", []),
-    showTerm(Left),
-    io:fwrite(" ",[]),
-    showTerm(Right),
-    io:fwrite(")",[]);
-showTerm({ann, Term, Type}) ->
-    io:fwrite("(", []),
-    showTerm(Term),
-    io:fwrite(" : ",[]),
-    showType(Type),
-    io:fwrite(")",[]);
-showTerm({const, bool}) ->
-    "C(Bool)";
-showTerm({if_else, Cond, TB, FB}) ->
-    io:fwrite("(", []),
-    showTerm(Cond),
-    io:fwrite("?", []),
-    showTerm(TB),
-    io:fwrite(":", []),
-    showTerm(FB),
-    io:fwrite(")", []);
-showTerm(Term) -> "Cannot show Unknown term: " ++ showAny(Term).
-
-test_cases() -> [
-  % A
-  abs("x", abs("y", v("x"))),
-  app(v("choose"), v("id")),
-  ann(app(v("choose"), v("id")), hm:funt([tid()], tid(), 0)),
-  app(app(v("choose"), v("Nil")), v("ids")),
-  app(v("id"), v("auto")),
-  app(v("id"), v("auto2")),  
-  app(app(v("choose"), v("id")), v("auto")),
-  app(app(v("choose"), v("id")), v("auto2")), % X
-  app(app(v("f"), app(v("choose"), v("id"))), v("ids")), % X
-  app(app(v("f"), ann(app(v("choose"), v("id")), hm:funt([tid()], tid(), 0))), v("ids")),
-  app(v("poly"), v("id")),
-  app(v("poly"), abs("x", v("x"))),
-  app(app(v("id"), v("poly")), abs("x", v("x"))),
-
-  %% B
-
-  %% C
-  app(v("length"), v("ids")),
-  app(v("tail"), v("ids")),
-  app(v("head"), v("ids")),
-  app(v("single"), v("id")),
-  ann(app(v("single"), v("id")), listT(tid())),
-  app(app(v("Cons"), v("id")), v("ids")),
-  app(app(v("Cons"), abs("x", v("x"))), v("ids")),
-  app(app(v("append"), app(v("single"), v("inc"))), app(v("single"), v("id"))),
-  app(app(v("g"), app(v("single"), v("id"))), v("ids")), %% X
-  app(app(v("g"), ann(app(v("single"), v("id")), listT(tid()))), v("ids")),
-  app(app(v("map"), v("poly")), app(v("single"), v("id"))),
-  app(app(v("map"), v("head")), app(v("single"), v("ids"))),
-
-  %% D
-  app(app(v("app"), v("poly")), v("id")),
-  app(app(v("revapp"), v("id")), v("poly")),
-  app(v("runST"), v("argST")),
-  app(app(v("app"), v("runST")), v("argST")),
-  app(app(v("revapp"), v("argST")), v("runST")),
-
-  %% E
-  app(app(v("k"), v("h")), v("l")), %% X
-  app(app(v("k"), abs("x", app(v("h"), v("x")))), v("l")),
-  app(v("r"), abs("x", abs("y", v("y"))))
-].
-
-infer_term(Term) -> 
-    try
-        showTerm(Term),
-        io:fwrite(" :: "),
-        Ty = infer(init_btc_env(), Term),
-        showType(Ty),
-        io:fwrite("~n",[])
-    catch
-        error: Reason ->
-        % showTerm(Term),
-        % io:fwrite("~n",[]),
-        type_error
-    end.
-
-all_tests() ->
-    lists:map(fun(Term) -> infer_term(Term) end, test_cases()),
-    done.
 %% BDTC - End %%
 
 type_check(Env, F) ->
@@ -644,7 +415,6 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
     case env:is_bound(X,Env) of
         true  ->
             VarT = lookup(X, Env, L),
-            % ?PRINT(VarT),
             synthAndSubsume(Env, Tvs, {var, L, X}, Type);
             % check_type_var(Env, Type, VarT);
         false -> 

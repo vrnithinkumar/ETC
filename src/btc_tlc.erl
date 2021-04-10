@@ -449,7 +449,6 @@ check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
         null -> synthAndSubsume(Env, Tvs, Term, Ty);
         ValidType -> check(Env, Tvs, Term, ValidType)
     end;
-    
 check(Env, Tvs, Term, {forall, _, _, _} = Ty) ->
     Sk = hm:freshTSkol(0),
     {tSkol, _, SkId} = Sk,
