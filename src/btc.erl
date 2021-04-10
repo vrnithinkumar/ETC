@@ -265,7 +265,6 @@ unify(Env, Tvs, {tcon, _, Left_A, [Right_A]}, {tcon, _, Left_B, [Right_B]}) ->
     {Env__, hm:tcon(Left_U, [Right_U], 0)};
 unify(Env, Tvs, {forall, Name_A, _, Body_A}=A, {forall, Name_A, _, Body_A}=B) ->
     Sk = hm:freshTSkol(),
-    % ?PRINT(Sk),
     {tSkol, _, SkId} = Sk,
     unify(Env, [SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
 unify(Env, Tvs, {tMeta, _, Id_m, _, _, _}, B) ->
@@ -300,7 +299,6 @@ end.
 
 subsume(Env, Tvs, Inf, {forall,_, _, _}=Ty) ->
     Sk = hm:freshTSkol(),
-    ?PRINT(Sk),
     {tSkol, _, SkId} = Sk,
     unify(Env, [SkId] ++ Tvs, Inf, openTForall(Ty, Sk));
 subsume(Env, Tvs, {forall, _, _, _}=Inf, Ty) ->
@@ -400,49 +398,6 @@ pickArg_(Env, Acc_Done, [{F,S} | Acc_Rem]) ->
             {Env_, {{F,S}, Acc_Done ++ Acc_Rem}}
     end.
 
-
-bt_check(Env, Tvs, {integer,L,_}, Type) ->
-    Inferred = hm:bt(integer, L),
-    case Inferred == Type of
-        false -> erlang:error({type_error," Cannot check the type of " });
-        _ -> nothing
-    end,
-    {Env, Type};
-bt_check(Env, Tvs, {string, L,_}, Type) ->
-    Inferred = hm:bt(string, L),
-    case Inferred == Type of
-        false -> erlang:error({type_error," Cannot check the type of " });
-        _ -> nothing
-    end,
-    {Env, Type};
-bt_check(Env, Tvs, {clause,L,_,_,_}=Node, Type) ->
-    ClausePatterns = clause_patterns(Node),
-    ClauseBody = clause_body(Node);
-    % {Env_, BodyRes, _} = bt_check_clause_body(EnvPat, ClauseBody, BodyType, Type);
-bt_check(Env, Tvs, Node, Type) ->
-        case type(Node) of
-            Fun when Fun =:= function; Fun =:= fun_expr ->
-                Clauses = case Fun of
-                    function -> function_clauses(Node);
-                    fun_expr -> fun_expr_clauses(Node)
-                end,
-                ClausesCheckRes = lists:map(fun(C) -> bt_check(Env,Tvs, C, Type) end, Clauses),
-                Result = lists:foldl(
-                    fun({_Env, Res, _T}, AccRes) ->
-                        AccRes and Res
-                    end, true, ClausesCheckRes),
-                {Env, Result, Type};
-            X -> erlang:error({type_error," Cannot check the type of " 
-                ++ util:to_string(Node) ++ " with node type "++ util:to_string(X)})
-        end;
-bt_check(_, _, Expr, Type) ->
-        io:format("Not supported Type-Check: ~p:~p ~n", [Expr, Type]).
-
-% check if the arg patters are matching.
-% given a body of a clause, returns its type
-bt_check_clause_body(Env, Tvs, BodyExprs, Type) ->
-    bt_check(Env, Tvs, lists:last(BodyExprs), Type).
-
 check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
     {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
     case Type of
@@ -469,7 +424,7 @@ check(Env, Tvs, Term, Ty) ->
     synthAndSubsume(Env, Tvs, Term, Ty).
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
-    {Env_, Inf} = synth(Env, Tvs, Term),
+    {Env_, Inf} = btc_synth(Env, Tvs, Term),
     subsume(Env_, Tvs, Inf, Ty).
 
 infer(Env, Term) ->
@@ -632,7 +587,7 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    {Env, Result, Type} = btc_check(Env, F, SpecFT),
+    {Env, Result, Type} = btc_check(Env, [], F, SpecFT),
     case Result of
         false -> erlang:error({type_error
                                , "Check failed for the function:: " ++ util:to_string(FunQName)});
@@ -641,58 +596,64 @@ do_btc_check(Env, F, SpecFT) ->
 
 do_btc_infer(Env, F) ->
     FunQName = util:getFnQName(F),
-    {Env, Result, Type} = btc_infer(Env, F),
-    case Result of
-        false -> erlang:error({type_error
-                                , "Check failed for the function:: " ++ util:to_string(FunQName)});
-        true  -> true
-    end.
+    ?PRINT(FunQName),
+    {SEnv, STy} = btc_synth(Env, [], F),
+    Ty_ = applyEnv(SEnv, STy),
+    % ?PRINT(Ty_),
+    % ?PRINT(env:get_meta_map(Env_)),
+    {_, PTy} = prune(SEnv, Ty_),
+    ?PRINT(PTy),
+    showType(PTy),
+    io:fwrite("~n",[]),
+    Env.
 
--spec btc_check(hm:env(), erl_syntax:syntaxTree(), hm:type()) ->
-    {hm:env(), boolean(), hm:type()}.
-btc_check(Env, {integer,L,_}, Type) ->
+-spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
+    {hm:env(),  hm:type()}.
+btc_check(Env, Tvs, {integer,L,_}, Type) ->
     Inferred = hm:bt(integer, L),
     case hm:is_type_var(Type) of
         true  ->
             Env1 = env:extend_type_var(Type, Inferred, Env),
-            {Env1, true, Inferred};
+            {Env1, Inferred};
         false ->
             IsSame = hm:isSubType(Inferred, Type),
-            {Env, IsSame, Inferred}
+            {Env, Inferred}
     end;
-btc_check(Env, {string, L,_}, Type) ->
+btc_check(Env, Tvs, {string, L,_}, Type) ->
     Inferred = hm:tcon("List", [hm:bt(char,L)],L),
     IsSame = hm:isSubType(Inferred, Type),
-    {Env, IsSame, Inferred};
-btc_check(Env, {char, L,_}, Type) ->
+    {Env, Inferred};
+btc_check(Env, Tvs, {char, L,_}, Type) ->
     Inferred = hm:bt(char,L),
     IsSame = hm:isSubType(Inferred, Type),
-    {Env, IsSame, Inferred};
-btc_check(Env, {float,L,_}, Type) ->
+    {Env, Inferred};
+btc_check(Env, Tvs, {float,L,_}, Type) ->
     Inferred = hm:bt(float, L),
     IsSame = hm:isSubType(Inferred, Type),
-    {Env, IsSame, Inferred};
-btc_check(Env, {atom,L,X}, Type) ->
+    {Env, Inferred};
+btc_check(Env, Tvs, {atom,L,X}, Type) ->
     Inferred = case X of
         B when is_boolean(B) -> hm:bt(boolean, L);
         _                    -> hm:bt(atom, L)
         end,
     IsSame = hm:isSubType(Inferred, Type),
-    {Env, IsSame, Inferred};
-btc_check(Env, {var, L, '_'}, Type) ->
-    {Env, true, Type};
-btc_check(Env, {var, L, X}, Type) ->
+    {Env, Inferred};
+btc_check(Env, Tvs, {var, L, '_'}, Type) ->
+    {Env, Type};
+btc_check(Env, Tvs, {var, L, X}, Type) ->
     case env:is_bound(X,Env) of
         true  ->
-            {VarT, _Ps} = etc:lookup(X, Env, L),
-            check_type_var(Env, Type, VarT);
+            VarT = lookup(X, Env, L),
+            % ?PRINT(VarT),
+            synthAndSubsume(Env, Tvs, {var, L, X}, Type);
+            % check_type_var(Env, Type, VarT);
         false -> 
             VarT = hm:replaceLn(Type, L),
             Env_ = env:extend(X, VarT, Env),
             % check_type_var(Env, Type, VarT),
-            {Env_, true, VarT}
+            {Env_, VarT}
     end;
-btc_check(Env,{match, L, _LNode, _RNode} = Node, Type) ->
+btc_check(Env, Tvs, {match, L, _LNode, _RNode} = Node, Type) ->
     ?PRINT(Node),
     {ResType, InfCs, InfPs} = etc:infer(Env, Node),
     % Solve unification constraints
@@ -704,29 +665,29 @@ btc_check(Env,{match, L, _LNode, _RNode} = Node, Type) ->
     SubdEnv = hm:subE(Env, hm:comp(Sub_, Sub)),
     {VarT, _Ps} = etc:lookup('X', SubdEnv, L),
     ?PRINT(VarT),
-    {SubdEnv, true, Type};
-btc_check(Env, {op, L, Op, E1, E2}, Type) ->
+    {SubdEnv, Type};
+btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
     OpType = lookup(Op, Env, L),
     case hm:has_type_var(OpType) of
         true  ->
             StrippedType = hm:type_without_bound(OpType),
             Arg1Type = hd(hm:get_fn_args(StrippedType)),
             Arg2Type = lists:last(hm:get_fn_args(StrippedType)),
-            {Env1, Res1, _T1} = btc_check(Env, E1, Arg1Type),
-            {Env2, Res2, _T2} = btc_check(Env1, E2, Arg2Type),
+            {Env1, Res1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
+            {Env2, Res2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
             Env_Solved = env_solver:solve_envs(Env1, Env2),
-            {Env_Solved, true, Type};
+            {Env_Solved, Type};
         false ->
             Arg1Type = hd(hm:get_fn_args(OpType)),
             Arg2Type = lists:last(hm:get_fn_args(OpType)),
             RetType = hm:get_fn_rt(OpType),
-            {Env1, Res1, _T1} = btc_check(Env, E1, Arg1Type),
-            {Env2, Res2, _T2} = btc_check(Env1, E2, Arg2Type),
+            {Env1, Res1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
+            {Env2, Res2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
             IsSame = hm:isSubType(RetType, Type),
-            {Env2, Res1 and IsSame and Res2, RetType}
+            {Env2,  RetType}
     end;
 
-btc_check(Env, {clause, L, _, _, _}=Clause, Type) ->
+btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     % ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
     % {EnvPat, PatResults, _} = checkPatterns(Env, ClausePatterns, Type),
@@ -736,50 +697,78 @@ btc_check(Env, {clause, L, _, _, _}=Clause, Type) ->
     %     end, true, PatResults),
     % ClauseGuards = clause_guard(Node),
     BodyType = hm:get_fn_rt(Type),
-    {Env_, BodyRes, _} = checkClauseBody(Env, ClauseBody, BodyType),
-    {Env_, BodyRes, Type};
-btc_check(Env, Node, Type) ->
+    {Env_, BodyRes, _} = checkClauseBody(Env, Tvs, ClauseBody, BodyType),
+    {Env_, Type};
+btc_check(Env, Tvs, Node, Type) ->
     case type(Node) of
         Fun when Fun =:= function; Fun =:= fun_expr ->
             Clauses = case Fun of
                 function -> function_clauses(Node);
                 fun_expr -> fun_expr_clauses(Node)
             end,
-            ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, C, Type) end, Clauses),
+            ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, Tvs, C, Type) end, Clauses),
             Result = lists:foldl(
                 fun({_Env, Res, _T}, AccRes) ->
                     AccRes and Res
                 end, true, ClausesCheckRes),
-            {Env, Result, Type};
-        X -> erlang:error({type_error," Cannot check the type of " 
-            ++ util:to_string(Node) ++ " with node type "++ util:to_string(X)})
+            {Env, Type};
+        _ -> synthAndSubsume(Env, Tvs, Node, Type)
     end;
-btc_check(_,Expr, Type) ->
-    io:format("Not supported Type-Check: ~p:~p ~n", [Expr, Type]).
+btc_check(Env, Tvs, Term, Ty) ->
+    synthAndSubsume(Env, Tvs, Term, Ty).
 
 
--spec btc_infer(hm:env(), erl_syntax:syntaxTree()) ->
+-spec btc_synth(hm:env(), [any()], erl_syntax:syntaxTree()) ->
     {hm:env(), hm:type()}.
-btc_infer(Env, {integer, L, _}) ->
+btc_synth(Env, _Tvs, {integer, L, _}) ->
     Inferred = hm:bt(integer, L),
     {Env, Inferred};
-btc_infer(Env, {string, L,_}) ->
+btc_synth(Env, _Tvs, {string, L,_}) ->
     Inferred = hm:tcon("List", [hm:bt(char,L)],L),
     {Env, Inferred};
-btc_infer(Env, {char, L,_}) ->
+btc_synth(Env, _Tvs, {char, L,_}) ->
     Inferred = hm:bt(char,L),
     {Env, Inferred};
-btc_infer(Env, {float,L,_}) ->
+btc_synth(Env, _Tvs, {float,L,_}) ->
     Inferred = hm:bt(float, L),
     {Env, Inferred};
-btc_infer(Env, {atom,L,X}) ->
+btc_synth(Env, _Tvs, {atom,L,X}) ->
     Inferred = case X of
         B when is_boolean(B) -> hm:bt(boolean, L);
         _                    -> hm:bt(atom, L)
         end,
     {Env, Inferred};
-btc_infer(_, Expr) ->
-    io:format("Not supported Type-Infer for : ~p ~n", [Expr]).
+btc_synth(Env, Tvs, {var, L, X}) ->
+    case env:is_bound(X,Env) of
+        true    ->
+            T = lookup(X, Env, L),
+            {Env, T};
+        false   ->
+            {Env_, A} = hm:freshTMeta(Env, Tvs, true, 0),
+            {env:extend(X, A, Env_), A}
+    end;
+btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
+    ClausePatterns = clause_patterns(Clause),
+    ClauseBody = clause_body(Clause),
+    {Env_1, A} = btc_synth(Env, Tvs, hd(ClausePatterns)),
+    {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
+    % Env_3 = env:extend(Name, A, Env_2),
+    {Env_3, Type} = btc_check(Env_2, Tvs, lists:last(ClauseBody), B),
+    {Env_3, hm:funt([A], B, 0)};
+btc_synth(Env, Tvs, Node) ->
+    case type(Node) of
+        Fun when Fun =:= function; Fun =:= fun_expr ->
+            Clauses = case Fun of
+                function -> function_clauses(Node);
+                fun_expr -> fun_expr_clauses(Node)
+            end,
+            % ClausesCheckRes = lists:map(fun(C) -> btc_synth(Env, Tvs, C) end, Clauses),
+            {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
+            ?PRINT(T),
+            {Env_ , T};
+        X -> erlang:error({type_error," Cannot synthesize the type of " 
+            ++ util:to_string(Node) ++ " with node type "++ util:to_string(X)})
+    end.
 
 % % check if the arg patterns are matching.
 % -spec checkPatterns(hm:env(),[erl_syntax:syntaxTree()], hm:types()) -> 
@@ -801,9 +790,9 @@ btc_infer(_, Expr) ->
 
 % check if the arg patters are matching.
 % given a body of a clause, returns its type
--spec checkClauseBody(hm:env(), erl_syntax:syntaxTree(), hm:types()) -> 
-    {hm:env(), boolean(), hm:types()}.
-checkClauseBody(Env, BodyExprs, Type) ->
+-spec checkClauseBody(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) -> 
+    {hm:env(), boolean(), hm:type()}.
+checkClauseBody(Env, Tvs, BodyExprs, Type) ->
     % TODO: We have to add support for let recursively here
     % {Env_, CsBody, PsBody} = lists:foldl(
     %     fun(Expr, {Ei,Csi,Psi}) -> 
@@ -811,7 +800,21 @@ checkClauseBody(Env, BodyExprs, Type) ->
     %         {Ei_, Csi ++ Csi_, Psi ++ Psi_}
     %     end, {Env,[],[]}, lists:droplast(BodyExprs)),
     % SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
-    btc_check(Env, lists:last(BodyExprs), Type).
+    btc_check(Env, Tvs, lists:last(BodyExprs), Type).
+
+% check if the arg patters are matching.
+% given a body of a clause, returns its type
+-spec inferClauseBody(hm:env(), [any()], erl_syntax:syntaxTree()) -> 
+    {hm:env(), hm:types()}.
+inferClauseBody(Env, Tvs, BodyExprs) ->
+    % TODO: We have to add support for let recursively here
+    % {Env_, CsBody, PsBody} = lists:foldl(
+    %     fun(Expr, {Ei,Csi,Psi}) -> 
+    %         {Ei_,Csi_,Psi_} = etc:checkExpr(Ei, Expr),
+    %         {Ei_, Csi ++ Csi_, Psi ++ Psi_}
+    %     end, {Env,[],[]}, lists:droplast(BodyExprs)),
+    % SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
+    btc_synth(Env, Tvs, lists:last(BodyExprs)).
 
 % -spec localConstraintSolver(hm:env(), [hm:constraint()], [hm:predicate()]) ->
 %     hm:env().

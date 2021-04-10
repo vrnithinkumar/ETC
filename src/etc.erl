@@ -162,11 +162,14 @@ inferOrCheck(Env, F, {AccCs, AccPs}) ->
     FunQName = util:getFnQName(F),
     Specs = env:getSpecs(Env),
     case spec:hasUserSpecifiedSpec(Specs, FunQName) of
-        false -> 
-            {T,Cs,Ps} = infer(Env,F),
-            {FreshT,_} = lookup(FunQName, Env, util:getLn(F)),
-            { unify(T, FreshT) ++ Cs ++ AccCs
-            , Ps ++ AccPs};
+        false ->
+            %% TODO REmove VR %%
+            % {T,Cs,Ps} = infer(Env,F),
+            % {FreshT,_} = lookup(FunQName, Env, util:getLn(F)),
+            % { unify(T, FreshT) ++ Cs ++ AccCs
+            % , Ps ++ AccPs};
+            btc:type_check(Env, F),
+            {AccCs, AccPs};
         true -> 
             btc:type_check(Env, F),
             {AccCs, AccPs}
