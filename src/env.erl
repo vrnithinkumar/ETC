@@ -10,6 +10,7 @@
         ,addExtModuleBindings/2,lookup_ext_binding/2
         ,printExtBindings/1, dumpModuleSpecs/2
         ,lookup_type_var/2, extend_type_var/3
+        ,set_meta/3, get_meta/2, get_meta_map/1
         ,readModuleSpecs/1, lookup_spec_binding/2, addSpecs/2, getSpecs/1]).
 
 -export_type([env/0]).
@@ -28,6 +29,7 @@
         constructors      = [],
         recFieldMap       = [],
         guardExpr         = [],
+        metaMap           = #{}, % hack to store meta var state
         isPattern         = false,
         isGuardExpr       = false
     }).
@@ -48,7 +50,7 @@ lookup({_Func, _ArgCount} = X,Env) ->
             end;
          Res -> Res
     end;
-lookup(X,Env) -> proplists:get_value(X, Env#ten.bindings).
+lookup(X, Env) -> proplists:get_value(X, Env#ten.bindings).
 
 lookup_ext_binding(X,Env) -> proplists:get_value(X, Env#ten.ext_bindings).
 
@@ -180,3 +182,12 @@ lookup_type_var(X, Env) -> proplists:get_value(X, Env#ten.type_var_bindings).
 
 extend_type_var(X, A, Env) ->
     Env#ten{type_var_bindings = [{X, A} | Env#ten.type_var_bindings]}.
+
+get_meta(Env, Id) -> 
+    maps:get(Id, Env#ten.metaMap, not_found).
+
+set_meta(Env, Id, Type) ->
+    Env#ten{metaMap = maps:put(Id, Type, Env#ten.metaMap)}.
+
+get_meta_map(Env) ->
+    Env#ten.metaMap.

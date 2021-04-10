@@ -5,7 +5,8 @@
     ,subT/2,subP/2
     ,subPs/2,free/1
     ,isTVar/1]).
--export([bt/2,funt/3,tvar/2,tcon/3,forall/4]).
+-export([bt/2,funt/3,tvar/2,tcon/3,forall/4, tMeta/4, tSkol/2]).
+-export([freshTMeta/3, freshTMeta/4, freshTSkol/1]).
 -export([freshen/1,generalize/3,eqType/2,fresh/1, specialize/2]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
 -export([is_same/2, isSubType/2]).
@@ -34,15 +35,18 @@
     | {tvar, integer(), type()}
     | {tcon, integer(), string(),[type()]}
     | {forall, type(), [predicate()], type()}
-    | {whilst, [predicate()], type()}.
+    | {whilst, [predicate()], type()}
+    | {tMeta, integer(), type(), [type()], type(), boolean()}
+    | {tSkol, type()}.
 
 % L is line/length
-bt (A,L)          -> {bt, L, A}. % A arguments , B is return type
-funt (A,B,L)      -> {funt, L, A, B}. % A arguments , B is return type
-tvar (A,L)        -> {tvar, L, A}. % L = Line, A : Name of the variable
-tcon(N,A,L)       -> {tcon, L, N, A}. % Name of the constructor A: args
-forall (X,P,A,L)  -> {forall, tvar(X,L), P, A}. %P for predicates
-
+bt(A,L)                 -> {bt, L, A}. % A arguments , B is return type
+funt(As,B,L)            -> {funt, L, As, B}. % A arguments list , B is return type
+tvar(A,L)               -> {tvar, L, A}. % L = Line, A : Name of the variable
+tcon(N,As,L)            -> {tcon, L, N, As}. % N:Name of the constructor A: args
+forall(X,Ps,A,L)        -> {forall, tvar(X,L), Ps, A}. %P for predicates
+tMeta(Id, Tvs, Mono, L) -> {tMeta, L, Id, Tvs, null, Mono}.
+tSkol(Id, L)            -> {tSkol, L, Id}.
 %%%%%%%%%%%% Constraint solver
 
 -spec solve([constraint()]) -> sub().
@@ -163,7 +167,7 @@ replaceLn(Type, NewLn) ->
     replaceLn(Type, OldLn, NewLn).
 
 -spec fresh(integer()) -> type().
-fresh(L) -> tvar(make_ref(),L).
+fresh(L) -> tvar(make_ref(), L).
 
 -spec emptySub() -> sub().
 emptySub () -> maps:new().
@@ -400,19 +404,29 @@ prettify(Env, {funt, _, As, B}) ->
     io:fwrite("->", []),
     Env__ = prettify(Env_,B),
     Env__;
+prettify(Env, {tvar, _, A}) when is_list(A) ->
+    io:fwrite("~s", [A]),
+    Env;
 prettify(Env, {tvar, _, A}) ->
     X = env:lookup(A, Env),
     case X of
         undefined -> 
             L = env:length(Env) + 65,
             io:fwrite("~c", [L]),
-            env:extend(A,L,Env);       
+            env:extend(A,L,Env);
         _         -> 
             io:fwrite("~c", [X]),
             Env
     end;
+prettify(Env, {tcon, _, N, As}) when not is_list(N)->
+    Env_ = prettify(Env, N),
+    io:fwrite(" "),
+    util:interFoldEffect(
+    fun(A,E) -> prettify(E,A) end
+    , fun() -> io:fwrite(" ") end
+    , Env_, As);
 prettify(Env, {tcon, _, N, As}) ->
-    case N of   
+    case N of
         "List" ->
             io:fwrite("["),
             E = util:interFoldEffect(
@@ -472,8 +486,53 @@ prettify(Env,{whilst,Ps,A}) ->
                 AccEnv__
         end
     end, Env, Ps),
-    prettify(Env1, A).
+    prettify(Env1, A);
+prettify(Env, {tMeta, L, Id, Tvs, Type, Mono}) ->
+    % TODO
+    % {tMeta, Id, Tvs, Type, Mono} = get_meta(Env, Id),
+    io:fwrite("?",[]),
+    case Mono of
+        true  -> io:fwrite("`",[]);
+        false -> io:fwrite("",[])
+    end,
 
+    X = env:lookup(Id, Env),
+    Env_ = case X of
+        undefined ->
+            MC = env:length(Env) + 65,
+            io:fwrite("~c~s", [MC, showList(Tvs)]),
+            env:extend(Id, MC, Env);
+        _         ->
+            io:fwrite("~c~s", [X, showList(Tvs)]),
+            Env
+    end,
+    case Type of
+        null  -> Env_;
+        Valid -> prettify(Env_, Valid)
+    end;
+prettify(Env, {tSkol, L, Id}) ->
+    X = env:lookup(Id, Env),
+    case X of
+        undefined ->
+            MC = env:length(Env) + 97,
+            io:fwrite("'~c", [MC]),
+            env:extend(Id, MC, Env);
+        _         ->
+            io:fwrite("'~c", [X]),
+            Env
+    end;
+prettify(Env, NotType) ->
+    ?PRINT(NotType),
+    Env.
+
+showList([]) -> "";
+showList(List) ->
+    ListToShow = io_lib:format("~p",[List]),
+    lists:flatten(ListToShow).
+
+showAny(Val) ->
+    ListToShow = io_lib:format("~p",[Val]),
+    lists:flatten(ListToShow).
 
 prettyCs([], S) -> S;
 prettyCs([{T1,T2}|Cs],S) -> 
@@ -536,3 +595,12 @@ type_without_bound(T) ->
 -spec is_type_var(type()) -> boolean().
 is_type_var({tvar, _, _}) -> true;
 is_type_var(_)            -> false.
+
+freshTSkol(L) -> tSkol(make_ref(), L).
+
+freshTMeta(Env, Tvs, Mono, L) ->
+    Ref = make_ref(),
+    TM = tMeta(Ref, Tvs, Mono, L),
+    Env_ = env:set_meta(Env, Ref, TM),
+    {Env_, TM}.
+freshTMeta(Env, Tvs, L) -> freshTMeta(Env, Tvs, false, L).

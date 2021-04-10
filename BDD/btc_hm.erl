@@ -283,7 +283,6 @@ unify(Env, Tvs, A , {tMeta, Id_m, _, _, _}) ->
 unify(_Env, _Tvs, A, B) ->
     terr("unify failed: " ++ showType(A) ++ " :-: " ++ showType(B)).
 
-
 unifyTMeta(Env, _Tvs, M, M) -> {Env, M};
 unifyTMeta(Env, Tvs, {tMeta, _, _, Type, _}, T) when Type /= null ->
     unify(Env, Tvs, Type, T);
@@ -436,6 +435,7 @@ synthAndSubsume(Env, Tvs, Term, Ty) ->
 
 infer(Env, Term) ->
     {Env_, Ty} = synth(Env, [], Term),
+    % ?PRINT(Ty),
     Ty_ = applyEnv(Env_, Ty),
     % ?PRINT(Ty_),
     % ?PRINT(Env_#ten.metaMap),
@@ -561,11 +561,11 @@ infer_term(Term) ->
     try
         Ty = infer(init_env(), Term), 
         Res = showTerm(Term) ++ " :: " ++ showType(Ty),
-        io:fwrite("~p ~n", [Res]) 
+        io:fwrite("~s ~n", [Res]) 
     catch
         error: Reason -> 
         MSG = showTerm(Term) ++ " :: " ++ Reason,
-        io:fwrite("~p ~n",[MSG])
+        io:fwrite("~s ~n",[MSG])
     end.
 
 all_tests() ->
@@ -578,16 +578,23 @@ basic_tests() ->
 
 tests_full_infer() ->
     % Term = app(app(v("choose"), v("Nil")), v("ids")),
+    Term = app(app(v("revapp"), v("argST")), v("runST")),
+    % Term = v("k"),
+    % Term = v("h"),
+    % Term = v("l"),
     % Term = app(app(v("k"), v("h")), v("l")), % X
     % Term = abs("x", c_bool()),
     % Term = func("foo", "x", app(v("foo"), v("x"))),
     % Term = if_else(c_bool(), c_bool(), c_bool()),
     % Term = ann(if_else(c_bool(), c_bool(), v("id")), tBool()),
-    Term = ann(c_bool(), tBool()),
+    % Term = ann(c_bool(), tBool()),
     % Term = app(v("f"), app(v("choose"), v("id"))) ,% X
     % Term = app(v("choose"), v("id")) ,% X
-    % Term = app(v("choose"), v("Nil")), 
+    % Term = app(v("choose"), v("Nil")),
+    % Term = v("Nil"),
     % Term = v("ids"),
+    % Term = v("id"),
     Ty = infer(init_env(), Term),
+    % ?PRINT(Ty),
     Res = showTerm(Term) ++ " :: " ++ showType(Ty),
     io:fwrite("Type Res: ~p ~n",[Res]).

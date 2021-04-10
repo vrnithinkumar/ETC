@@ -1,0 +1,33 @@
+(\x.(\y.x)) :: (?`A)->(?`B)->?`A
+(choose id) :: ((?A)->?A)->(?A)->?A
+((choose id) : ((t)->t)->(t)->t) :: ((t)->t)->(t)->t
+((choose Nil) ids) :: [(t)->t]
+(id auto) :: ((t)->t)->(t)->t
+(id auto2) :: ((t)->t)->(?A)->?A
+((choose id) auto) :: ((t)->t)->(t)->t
+((choose id) auto2) :: unify failed with types (t)->t :=: (?A)->?A
+((f (choose id)) ids) :: unify failed with types (?A)->?A :=: (t)->t
+((f ((choose id) : ((t)->t)->(t)->t)) ids) :: (t)->t
+(poly id) :: Pair integer bool
+(poly (\x.x)) :: Pair integer bool
+((id poly) (\x.x)) :: Pair integer bool
+(length ids) :: integer
+(tail ids) :: [(t)->t]
+(head ids) :: (t)->t
+(single id) :: [(?A)->?A]
+((single id) : [(t)->t]) :: [(t)->t]
+((Cons id) ids) :: [(t)->t]
+((Cons (\x.x)) ids) :: [(t)->t]
+((append (single inc)) (single id)) :: [(integer)->integer]
+((g (single id)) ids) :: unify failed with types (?A)->?A :=: (t)->t
+((g ((single id) : [(t)->t])) ids) :: (t)->t
+((map poly) (single id)) :: [Pair integer bool]
+((map head) (single ids)) :: [(t)->t]
+((app poly) id) :: Pair integer bool
+((revapp id) poly) :: Pair integer bool
+(runST argST) :: integer
+((app runST) argST) :: integer
+((revapp argST) runST) :: integer
+((k h) l) :: unify failed with types (t)->t :=: ('a)->'a
+((k (\x.(h x))) l) :: (integer)->(t)->t
+(r (\x.(\y.y))) :: integer
