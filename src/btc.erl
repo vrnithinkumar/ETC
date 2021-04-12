@@ -107,15 +107,18 @@ flattenApp(T) -> {T, []}.
 substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
 substTVar(X, S, {tMeta, _ , _Id, _Tvs, Type, _}) when Type /= null ->
     substTVar(X, S, Type);
-substTVar(X, S, {funt, _, [Left], Right}) ->
-    hm:funt([substTVar(X, S, Left)], substTVar(X, S, Right), 0);
-substTVar(X, S, {tcon, _, Left, [Right]}) ->
-    hm:tcon(substTVar(X, S, Left), [substTVar(X, S, Right)], 0);
+substTVar(X, S, {funt, _, Args, RetTy}) ->
+    SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
+    hm:funt(SubArgs, substTVar(X, S, RetTy), 0);
+substTVar(X, S, {tcon, _, Name, Args}) ->
+    SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
+    hm:tcon(substTVar(X, S, Name), SubArgs, 0);
 substTVar(X, S, {forall, Name, _, Body}) when Name /= X ->
     {forall, Name, [], substTVar(X, S, Body)};
 substTVar(_X, _S, T) -> T.
 
-openTForall({forall, Name, _, Body}, T) -> substTVar(Name, T, Body).
+openTForall({forall, Name, _, Body}, T) ->
+    substTVar(Name, T, Body).
 
 % Subtyping
 checkSolution(Env, T, T) -> {Env, false};
@@ -324,28 +327,11 @@ check(Env, Tvs, Term, Ty) ->
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
     {Env_, Inf} = btc_synth(Env, Tvs, Term),
+    % ?PRINT(Inf),
+    % ?PRINT(Ty),
     subsume(Env_, Tvs, Inf, Ty).
 
-infer(Env, Term) ->
-    {Env_, Ty} = synth(Env, [], Term),
-    % ?PRINT(Ty),
-    Ty_ = applyEnv(Env_, Ty),
-    % ?PRINT(Ty_),
-    % ?PRINT(env:get_meta_map(Env_)),
-    {_, PTy} = prune(Env_, Ty_),
-    PTy.
-
-% Terms
-var(Name)        -> {var, Name}.
-c_bool()         -> {const, bool}.
-abs(Name, Body)  -> {abs, Name, Body}.
-app(Left, Right) -> {app, Left, Right}.
-ann(Term, Type)  -> {ann, Term, Type}.
-func(FName, VName, Body) -> {func, FName, VName, Body}.
-if_else(Cond, TB, FB) -> {if_else, Cond, TB, FB}.
-
 %% BDTC - End %%
-
 type_check(Env, F) ->
     FunQName = util:getFnQName(F),
     Specs = env:getSpecs(Env),
@@ -374,7 +360,7 @@ do_btc_infer(Env, F) ->
     % ?PRINT(Ty_),
     % ?PRINT(env:get_meta_map(Env_)),
     {_, PTy} = prune(SEnv, Ty_),
-    % ?PRINT(PTy),
+    ?PRINT(PTy),
     io:fwrite("~p :: ",[FunQName]),
     showType(PTy),
     io:fwrite("~n",[]),
@@ -444,11 +430,16 @@ btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
     OpType = lookup(Op, Env, L),
     case hm:has_type_var(OpType) of
         true  ->
-            StrippedType = hm:type_without_bound(OpType),
-            Arg1Type = hd(hm:get_fn_args(StrippedType)),
-            Arg2Type = lists:last(hm:get_fn_args(StrippedType)),
-            RetType = hm:get_fn_rt(StrippedType),
-            {Env1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
+            % StrippedType = hm:type_without_bound(OpType),
+            {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
+            ?PRINT(OpenedType),
+            Arg1Type = hd(hm:get_fn_args(OpenedType)),
+            Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
+            RetType = hm:get_fn_rt(OpenedType),
+            ?PRINT(OpType),
+            ?PRINT(E1),
+            ?PRINT(Arg1Type),
+            {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
             {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
             subsume(Env2, Tvs, RetType, Type);
         false ->
@@ -460,7 +451,6 @@ btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
             subsume(Env2, Tvs, RetType, Type),
             {Env2,  RetType}
     end;
-
 btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     % ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
@@ -525,10 +515,10 @@ btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
     {Env_1, A} = btc_synth(Env, Tvs, hd(ClausePatterns)),
-    {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
+    {Env_2, B} = hm:freshTMeta(Env_1, Tvs, L),
     % Env_3 = env:extend(Name, A, Env_2),
-    {Env_3, Type} = btc_check(Env_2, Tvs, lists:last(ClauseBody), B),
-    {Env_3, hm:funt([A], B, 0)};
+    {Env_3, _} = btc_check(Env_2, Tvs, lists:last(ClauseBody), B),
+    {Env_3, hm:funt([A], B, L)};
 btc_synth(Env, Tvs, Node) ->
     case type(Node) of
         Fun when Fun =:= function; Fun =:= fun_expr ->
@@ -538,7 +528,6 @@ btc_synth(Env, Tvs, Node) ->
             end,
             % ClausesCheckRes = lists:map(fun(C) -> btc_synth(Env, Tvs, C) end, Clauses),
             {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
-            ?PRINT(T),
             {Env_ , T};
         X -> erlang:error({type_error," Cannot synthesize the type of " 
             ++ util:to_string(Node) ++ " with node type "++ util:to_string(X)})
@@ -654,3 +643,20 @@ case hm:is_type_var(Type) of
         IsSame = hm:isSubType(Inferred, Type),
         {Env, IsSame, Inferred}
 end.
+
+open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
+    {Env_1, M} = hm:freshTMeta(Env, Tvs, true, 0), % TODO:why true no idea?
+    Env_2 = case C of 
+        [{class, CName, _ }] ->
+            ClassType = hm:tvar(CName, 0),
+            udpate_tmeta_type(Env_1, M, ClassType);
+        _ -> Env
+    end,
+    Opened = openTForall(Ty, M),
+    open_op_type(Env_2, Tvs, Opened);
+open_op_type(Env, _, OpType) ->
+    {Env, OpType}.
+
+udpate_tmeta_type(Env, {tMeta, L, Id_t, Tvs_t, _, Mono}, Type)->
+    NewMeta = {tMeta, L, Id_t, Tvs_t, Type, Mono},
+    env:set_meta(Env, Id_t, NewMeta).
