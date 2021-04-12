@@ -12,12 +12,12 @@
 - [X] Integrate the BDTC to ETC
   - [X] Simple erlang function
   - [-] Full support
-    - [ ] (_,{integer,L,_})
-    - [ ] (_, {string,L,_})
-    - [ ] (_,{char,L,_}) ->
-    - [ ] (_,{float,L,_}) ->
+    - [X] (_,{integer,L,_})
+    - [X] (_, {string,L,_})
+    - [X] (_,{char,L,_}) ->
+    - [X] (_,{float,L,_}) ->
     - [ ] (Env,{clause,L,_,_,_}=Node) ->
-    - [ ] (_,{var,L,'_'}) ->
+    - [X] (_,{var,L,'_'}) ->
     - [ ] (Env,{var, L, X}) ->
     - [ ] (Env,{call,L,{atom,_,is_function},[F,{integer,_,Arity}]}) ->
     - [ ] (Env,{call,L,{atom,_,element},[{integer,_,N},{tuple,_,Es}]}) ->
@@ -48,6 +48,3 @@
 ## Type Rules
 - [ ] Define Type rules for core erlang
 - [ ] Very basic using polymorphic bd type checking rules
-
-
->

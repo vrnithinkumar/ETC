@@ -357,26 +357,30 @@ type_check(Env, F) ->
     end.
 
 do_btc_check(Env, F, SpecFT) ->
-    FunQName = util:getFnQName(F),
-    {Env, Result, Type} = btc_check(Env, [], F, SpecFT),
-    case Result of
-        false -> erlang:error({type_error
-                               , "Check failed for the function:: " ++ util:to_string(FunQName)});
-        true  -> true
-    end.
+    % FunQName = util:getFnQName(F),
+    {Env_, Type} = btc_check(Env, [], F, SpecFT),
+    Env_.
+    % case Result of
+    %     false -> erlang:error({type_error
+    %                            , "Check failed for the function:: " ++ util:to_string(FunQName)});
+    %     true  -> true
+    % end.
 
 do_btc_infer(Env, F) ->
     FunQName = util:getFnQName(F),
-    ?PRINT(FunQName),
+    % ?PRINT(FunQName),
     {SEnv, STy} = btc_synth(Env, [], F),
     Ty_ = applyEnv(SEnv, STy),
     % ?PRINT(Ty_),
     % ?PRINT(env:get_meta_map(Env_)),
     {_, PTy} = prune(SEnv, Ty_),
-    ?PRINT(PTy),
+    % ?PRINT(PTy),
+    io:fwrite("~p :: ",[FunQName]),
     showType(PTy),
     io:fwrite("~n",[]),
-    Env.
+    Env_ = env:extend(FunQName, PTy, SEnv),
+    % ?PRINT(Env_),
+    Env_.
 
 -spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
     {hm:env(),  hm:type()}.
@@ -443,17 +447,17 @@ btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
             StrippedType = hm:type_without_bound(OpType),
             Arg1Type = hd(hm:get_fn_args(StrippedType)),
             Arg2Type = lists:last(hm:get_fn_args(StrippedType)),
-            {Env1, Res1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
-            {Env2, Res2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
-            Env_Solved = env_solver:solve_envs(Env1, Env2),
-            {Env_Solved, Type};
+            RetType = hm:get_fn_rt(StrippedType),
+            {Env1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
+            {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
+            subsume(Env2, Tvs, RetType, Type);
         false ->
             Arg1Type = hd(hm:get_fn_args(OpType)),
             Arg2Type = lists:last(hm:get_fn_args(OpType)),
             RetType = hm:get_fn_rt(OpType),
-            {Env1, Res1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
-            {Env2, Res2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
-            IsSame = hm:isSubType(RetType, Type),
+            {Env1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
+            {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
+            subsume(Env2, Tvs, RetType, Type),
             {Env2,  RetType}
     end;
 
