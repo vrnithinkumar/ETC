@@ -9,7 +9,7 @@
 -export([freshTMeta/3, freshTMeta/4, freshTSkol/1]).
 -export([freshen/1,generalize/3,eqType/2,fresh/1, specialize/2]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
--export([is_same/2, isSubType/2]).
+-export([is_same/2, isSubType/2, get_all_class_types/1]).
 -export([has_type_var/1, is_type_var/1, type_without_bound/1]).
 -export([get_fn_args/1, get_fn_rt/1]).
 -export_type([constraint/0,type/0]).
@@ -378,6 +378,9 @@ has_matching([H| Tail], Type) ->
         false -> has_matching(Tail, Type)
     end.
 
+get_all_class_types(Class) ->
+    get_all_class_types(rt:defaultClasses(), Class).
+
 get_all_class_types([], Class) -> [];
 get_all_class_types([H| Tail], Class) ->
     case H of 
@@ -570,9 +573,13 @@ is_same_predicates(P1s,P2s)->
             lists:map(fun({P1, P2}) -> P1==P2 end, lists:zip(P1s,P2s))).
 
 %% Sub type relation checker
-isSubType(T, {tcon, _, "Union", Ts}=UT) ->
+isSubType({tcon, _, "Union", Ts}, T) ->
+    lists:any(fun(X) -> eqType(T, X) end, Ts);
+isSubType(T, {tcon, _, "Union", Ts}) ->
     lists:any(fun(X) -> eqType(T, X) end, Ts);
 isSubType(T1, T2) -> eqType(T1, T2).
+
+% most_general_type()
 
 %% Type Check Helpers
 get_fn_args({funt, _, Args, _}) ->

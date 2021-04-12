@@ -175,13 +175,17 @@ unify(Env, Tvs, {tMeta, _, Id_m, _, _, _}, B) ->
 unify(Env, Tvs, A , {tMeta, _, Id_m, _, _, _}) ->
     B = env:get_meta(Env, Id_m),
     unifyTMeta(Env, Tvs, B, A);
-unify(_Env, _Tvs, A, B) ->
-    io:fwrite("unify failed with types ",[]),
-    showType(A),
-    io:fwrite(" :=: ",[]),
-    showType(B),
-    io:fwrite("~n",[]),
-    terr("unify failed!").
+unify(Env, _Tvs, A, B) ->
+    case hm:isSubType(A, B) of
+        true-> {Env, A};
+        false ->
+            io:fwrite("unify failed with types ",[]),
+            showType(A),
+            io:fwrite(" :=: ",[]),
+            showType(B),
+            io:fwrite("~n",[]),
+            terr("unify failed!")
+    end.
 
 unifyTMeta(Env, _Tvs, M, M) -> {Env, M};
 unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type /= null ->
@@ -371,34 +375,27 @@ do_btc_infer(Env, F) ->
 -spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
     {hm:env(),  hm:type()}.
 btc_check(Env, Tvs, {integer,L,_}, Type) ->
-    Inferred = hm:bt(integer, L),
-    case hm:is_type_var(Type) of
-        true  ->
-            Env1 = env:extend_type_var(Type, Inferred, Env),
-            {Env1, Inferred};
-        false ->
-            IsSame = hm:isSubType(Inferred, Type),
-            {Env, Inferred}
-    end;
+    Inf = hm:bt(integer, L),
+    subsume(Env, Tvs, Inf, Type);
 btc_check(Env, Tvs, {string, L,_}, Type) ->
-    Inferred = hm:tcon("List", [hm:bt(char,L)],L),
-    IsSame = hm:isSubType(Inferred, Type),
-    {Env, Inferred};
+    Inf= hm:tcon("List", [hm:bt(char,L)],L),
+    subsume(Env, Tvs, Inf, Type),
+    {Env, Inf};
 btc_check(Env, Tvs, {char, L,_}, Type) ->
-    Inferred = hm:bt(char,L),
-    IsSame = hm:isSubType(Inferred, Type),
-    {Env, Inferred};
+    Inf= hm:bt(char,L),
+    subsume(Env, Tvs, Inf, Type),
+    {Env, Inf};
 btc_check(Env, Tvs, {float,L,_}, Type) ->
-    Inferred = hm:bt(float, L),
-    IsSame = hm:isSubType(Inferred, Type),
-    {Env, Inferred};
+    Inf = hm:bt(float, L),
+    subsume(Env, Tvs, Inf, Type),
+    {Env, Inf};
 btc_check(Env, Tvs, {atom,L,X}, Type) ->
-    Inferred = case X of
+    Inf = case X of
         B when is_boolean(B) -> hm:bt(boolean, L);
         _                    -> hm:bt(atom, L)
         end,
-    IsSame = hm:isSubType(Inferred, Type),
-    {Env, Inferred};
+        subsume(Env, Tvs, Inf, Type),
+    {Env, Inf};
 btc_check(Env, Tvs, {var, L, '_'}, Type) ->
     {Env, Type};
 btc_check(Env, Tvs, {var, L, X}, Type) ->
@@ -431,14 +428,11 @@ btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
     case hm:has_type_var(OpType) of
         true  ->
             % StrippedType = hm:type_without_bound(OpType),
+            % ?PRINT(OpType),
             {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
-            ?PRINT(OpenedType),
             Arg1Type = hd(hm:get_fn_args(OpenedType)),
             Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
             RetType = hm:get_fn_rt(OpenedType),
-            ?PRINT(OpType),
-            ?PRINT(E1),
-            ?PRINT(Arg1Type),
             {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
             {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
             subsume(Env2, Tvs, RetType, Type);
@@ -648,8 +642,10 @@ open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
     {Env_1, M} = hm:freshTMeta(Env, Tvs, true, 0), % TODO:why true no idea?
     Env_2 = case C of 
         [{class, CName, _ }] ->
-            ClassType = hm:tvar(CName, 0),
-            udpate_tmeta_type(Env_1, M, ClassType);
+            CUT = type_class_to_union(CName),
+            % ?PRINT(CTs),
+            % ClassType = hm:tvar(CName, 0),
+            udpate_tmeta_type(Env_1, M, CUT);
         _ -> Env
     end,
     Opened = openTForall(Ty, M),
@@ -660,3 +656,10 @@ open_op_type(Env, _, OpType) ->
 udpate_tmeta_type(Env, {tMeta, L, Id_t, Tvs_t, _, Mono}, Type)->
     NewMeta = {tMeta, L, Id_t, Tvs_t, Type, Mono},
     env:set_meta(Env, Id_t, NewMeta).
+
+latest_tmeta_type(Env, {tMeta, _, Id, _, _, _})->
+    env:get_meta(Env, Id).
+
+type_class_to_union(CName)->
+    CTs = hm:get_all_class_types(CName),
+    hm:tcon("Union", CTs, 0).
