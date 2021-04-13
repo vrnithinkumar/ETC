@@ -71,18 +71,26 @@ prune(Env, {tMeta, _, Id_m, _, _, _}) ->
             {Env_2, PT}
             % {Env_2, UpdatedMeta}
     end;
-prune(Env, {funt, _, [ArgT], RetT}) ->
-    {Env_L, PT_L} = prune(Env, ArgT),
+prune(Env, {funt, _, ArgTys, RetT}) ->
+    {Env_L, PT_L} = prune_list(Env, ArgTys),
     {Env_R, PT_R} = prune(Env_L, RetT),
-    {Env_R, hm:funt([PT_L], PT_R, 0)};
-prune(Env, {tcon, _,Left, [Right]}) ->
+    {Env_R, hm:funt(PT_L, PT_R, 0)};
+prune(Env, {tcon, _,Left, ArgTys}) ->
     {Env_L, PT_L} = prune(Env, Left),
-    {Env_R, PT_R} = prune(Env_L, Right),
-    {Env_R, hm:tcon(PT_L, [PT_R], 0)};
+    {Env_R, PT_R} = prune_list(Env_L, ArgTys),
+    {Env_R, hm:tcon(PT_L, PT_R, 0)};
 prune(Env, {forall, Name, _, Body}) ->
     {Env_, PT} = prune(Env, Body),
     {Env_, {forall, Name, [], PT}};
 prune(Env, T) -> {Env, T}.
+
+prune_list(Env, Types) ->
+    lists:foldr(fun(T, {Ei, AccTy}) ->
+        {Ei_, PTy} = prune(Ei, T),
+        {Ei_, AccTy++[PTy]}
+    end,
+    {Env, []},
+    Types).
 
 applyEnv(Env, {tMeta, _, Id, _, _, _}) ->
     Res = env:get_meta(Env, Id),
@@ -404,7 +412,8 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
             VarT = lookup(X, Env, L),
             synthAndSubsume(Env, Tvs, {var, L, X}, Type);
             % check_type_var(Env, Type, VarT);
-        false -> 
+        false ->
+            % ?PRINT(Type),
             VarT = hm:replaceLn(Type, L),
             Env_ = env:extend(X, VarT, Env),
             % check_type_var(Env, Type, VarT),
@@ -505,14 +514,20 @@ btc_synth(Env, Tvs, {var, L, X}) ->
             {Env_, A} = hm:freshTMeta(Env, Tvs, true, 0),
             {env:extend(X, A, Env_), A}
     end;
+btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
+    {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
+    {Env_2, RTy} = btc_synth(Env_1, Tvs, RNode),
+    subsume(Env_2, Tvs, LTy, RTy);
 btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
-    {Env_1, A} = btc_synth(Env, Tvs, hd(ClausePatterns)),
+    % {Env_1, A} = btc_synth(Env, Tvs, hd(ClausePatterns)),
+    {Env_1, As} = synth_clause_patterns(Env, Tvs, ClausePatterns),
     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, L),
     % Env_3 = env:extend(Name, A, Env_2),
-    {Env_3, _} = btc_check(Env_2, Tvs, lists:last(ClauseBody), B),
-    {Env_3, hm:funt([A], B, L)};
+    Env_3 = synth_clause_body(Env_2, Tvs, ClauseBody),
+    {Env_4, _} = btc_check(Env_3, Tvs, lists:last(ClauseBody), B),
+    {Env_4, hm:funt(As, B, L)};
 btc_synth(Env, Tvs, Node) ->
     case type(Node) of
         Fun when Fun =:= function; Fun =:= fun_expr ->
@@ -663,3 +678,19 @@ latest_tmeta_type(Env, {tMeta, _, Id, _, _, _})->
 type_class_to_union(CName)->
     CTs = hm:get_all_class_types(CName),
     hm:tcon("Union", CTs, 0).
+
+synth_clause_patterns(Env, _, []) ->
+    {Env, []};
+synth_clause_patterns(Env, Tvs, [P|Ps]) ->
+    {Env_1, A} = btc_synth(Env, Tvs, P),
+    {Env_2, As} = synth_clause_patterns(Env_1, Tvs, Ps),
+    {Env_2, [A|As]}.
+
+%% this is our let
+synth_clause_body(Env, Tvs, Body) ->
+    lists:foldr(fun(Expr, Ei) ->
+            {Ei_, _} = btc_synth(Ei, Tvs, Expr),
+            Ei_
+        end,
+        Env,
+        lists:droplast(Body)).
