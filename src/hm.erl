@@ -145,12 +145,14 @@ isTVar({tvar, _L, _}) -> true;
 isTVar(_)             -> false.
 
 -spec getLn(type()) -> integer().
-getLn ({bt, L, _})          -> L;
-getLn ({funt, L, _, _})     -> L;
-getLn ({tvar, L, _})        -> L;
-getLn ({tcon, L, _, _})    -> L;
+getLn ({bt, L, _})                   -> L;
+getLn ({funt, L, _, _})              -> L;
+getLn ({tvar, L, _})                 -> L;
+getLn ({tcon, L, _, _})              -> L;
 getLn ({forall, {tvar, L, _}, _, _}) -> L;
-getLn ({whilst, _, T}) -> getLn(T).
+getLn ({whilst, _, T})               -> getLn(T);
+getLn ({tMeta, L, _, _, _, _})       -> L;
+getLn ({tSkol, L, _})                -> L.
 
 -spec replaceLn(type(),integer(),integer()) -> type().
 replaceLn ({bt, L0, X},L0,L1)         -> {bt, L1, X};
