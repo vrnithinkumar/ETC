@@ -82,7 +82,8 @@ parse_transform(Forms,_) ->
     % type check each SCC and extend Env
     try
         lists:foldl(fun(SCC, AccEnv) ->
-            typeCheckSCC(SCC, AccEnv)
+            % typeCheckSCC(SCC, AccEnv)
+            btc_typeCheckSCC(SCC, AccEnv)
         end, Env, SCCs)
     of  
         Env_ -> 
@@ -129,6 +130,7 @@ typeCheckSCC(Functions, Env) ->
     end, Env, Functions),
     {InfCs,InfPs} = lists:foldl(fun(F, AccCsPs) ->
         inferOrCheck(FreshEnv, F, AccCsPs)
+        % btc_synth_check(FreshEnv, F, AccCsPs)
     end, {[],[]}, Functions),
 
     %% Add all specs to Env
@@ -161,19 +163,46 @@ typeCheckSCC(Functions, Env) ->
 inferOrCheck(Env, F, {AccCs, AccPs}) ->
     FunQName = util:getFnQName(F),
     Specs = env:getSpecs(Env),
+    {FreshT,_} = lookup(FunQName, Env, util:getLn(F)),
     case spec:hasUserSpecifiedSpec(Specs, FunQName) of
         false ->
             %% TODO REmove VR %%
             % {T,Cs,Ps} = infer(Env,F),
-            % {FreshT,_} = lookup(FunQName, Env, util:getLn(F)),
-            % { unify(T, FreshT) ++ Cs ++ AccCs
-            % , Ps ++ AccPs};
-            btc:type_check(Env, F),
-            {AccCs, AccPs};
+            {_Env, T} = btc:type_check(Env, F),
+            {AccCs, AccPs},
+            { unify(T, FreshT) ++ AccCs , AccPs};
         true -> 
-            btc:type_check(Env, F),
+            {_Env, T} = btc:type_check(Env, F),
             {AccCs, AccPs}
     end.
+
+
+btc_typeCheckSCC(Functions, Env) ->
+    %% Add all specs to Env
+    EnvWithSpec = lists:foldl(fun(F, AccEnv) ->
+        FunQName = util:getFnQName(F),
+        Specs = env:getSpecs(Env),
+        case spec:hasUserSpecifiedSpec(Specs, FunQName) of
+            true -> 
+                FT = spec:getFirstSpecType(Specs, FunQName),
+                env:extend(FunQName, FT, AccEnv);
+            false -> AccEnv
+        end
+    end, Env, Functions),
+    {CheckedEnv, _Types} = lists:foldl(fun(F, {AccEnv, Ts}) ->
+        % inferOrCheck(FreshEnv, F, AccCsPs)
+        {E, T} = btc:type_check(AccEnv, F),
+        {E, Ts ++ [T]}
+    end, {EnvWithSpec,[]}, Functions),
+    % ?PRINT(Types),
+    lists:foldl(fun(F, AccEnv) ->
+        FunQName = util:getFnQName(F),
+        %lookup type from the substituted environment
+        % ?PRINT(FunQName),
+        {T,_}  = lookup(FunQName, CheckedEnv, util:getLn(F)),
+        % ?PRINT(T),
+        env:extend(FunQName, T, AccEnv)
+    end, Env, Functions).
 
 -spec infer(hm:env(), erl_syntax:syntaxTree()) ->
     {hm:type(),[hm:constraint()],[hm:predicate()]}.

@@ -200,6 +200,14 @@ subT ({forall, {tvar, L, X}, Ps, A}, Sub)   ->
         false   ->  {forall, {tvar, L, X}, subPs(Ps,Sub) ,subT(A,Sub)}
     end;
 subT ({whilst,Ps,T},Sub) -> {whilst,subPs(Ps,Sub),subT(T,Sub)};
+%% VR todo added
+subT ({tMeta, L, Id, Tvs, T, Mono},Sub) ->
+    case T of
+        null -> {tMeta, L, Id, Tvs, T, Mono};
+        _    -> {tMeta, L, Id, Tvs, subT(T,Sub), Mono}
+    end;
+subT ({tSkol, L, Id}, _) ->
+    {tSkol, L, Id};
 %% TODO VR : Fix how to support multiple definitions%%
 subT ([Type|_Rest], Sub) -> subT(Type, Sub).
 

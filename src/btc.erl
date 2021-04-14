@@ -357,7 +357,7 @@ type_check(Env, F) ->
 do_btc_check(Env, F, SpecFT) ->
     % FunQName = util:getFnQName(F),
     {Env_, Type} = btc_check(Env, [], F, SpecFT),
-    Env_.
+    {Env_, Type}.
     % case Result of
     %     false -> erlang:error({type_error
     %                            , "Check failed for the function:: " ++ util:to_string(FunQName)});
@@ -371,14 +371,14 @@ do_btc_infer(Env, F) ->
     Ty_ = applyEnv(SEnv, STy),
     % ?PRINT(Ty_),
     % ?PRINT(env:get_meta_map(Env_)),
-    {_, PTy} = prune(SEnv, Ty_),
-    ?PRINT(PTy),
-    io:fwrite("~p :: ",[FunQName]),
-    showType(PTy),
-    io:fwrite("~n",[]),
-    Env_ = env:extend(FunQName, PTy, SEnv),
+    {Env_, PTy} = prune(SEnv, Ty_),
+    % ?PRINT(PTy),
+    % io:fwrite("~p :: ",[FunQName]),
+    % showType(PTy),
+    % io:fwrite("~n",[]),
+    ExtendedEnv = env:extend(FunQName, PTy, Env_),
     % ?PRINT(Env_),
-    Env_.
+    {ExtendedEnv, PTy}.
 
 -spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
     {hm:env(),  hm:type()}.
