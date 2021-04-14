@@ -121,8 +121,8 @@ substTVar(X, S, {funt, _, Args, RetTy}) ->
 substTVar(X, S, {tcon, _, Name, Args}) ->
     SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
     hm:tcon(substTVar(X, S, Name), SubArgs, 0);
-substTVar(X, S, {forall, Name, _, Body}) when Name /= X ->
-    {forall, Name, [], substTVar(X, S, Body)};
+substTVar(X, S, {forall, Name, Ps, Body}) when Name /= X ->
+    {forall, Name, Ps, substTVar(X, S, Body)};
 substTVar(_X, _S, T) -> T.
 
 openTForall({forall, Name, _, Body}, T) ->
@@ -655,10 +655,8 @@ open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
     Env_2 = case C of 
         [{class, CName, _ }] ->
             CUT = type_class_to_union(CName),
-            % ?PRINT(CTs),
-            % ClassType = hm:tvar(CName, 0),
             udpate_tmeta_type(Env_1, M, CUT);
-        _ -> Env
+        _ -> Env_1
     end,
     Opened = openTForall(Ty, M),
     open_op_type(Env_2, Tvs, Opened);
