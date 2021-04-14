@@ -451,8 +451,7 @@ btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
             RetType = hm:get_fn_rt(OpType),
             {Env1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
             {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
-            subsume(Env2, Tvs, RetType, Type),
-            {Env2,  RetType}
+            subsume(Env2, Tvs, RetType, Type)
     end;
 btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     % ClausePatterns = clause_patterns(Clause),
@@ -480,9 +479,7 @@ btc_check(Env, Tvs, Node, Type) ->
                 end, true, ClausesCheckRes),
             {Env, Type};
         _ -> synthAndSubsume(Env, Tvs, Node, Type)
-    end;
-btc_check(Env, Tvs, Term, Ty) ->
-    synthAndSubsume(Env, Tvs, Term, Ty).
+    end.
 
 
 -spec btc_synth(hm:env(), [any()], erl_syntax:syntaxTree()) ->
