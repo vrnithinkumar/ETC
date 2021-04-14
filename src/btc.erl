@@ -511,6 +511,15 @@ btc_synth(Env, Tvs, {var, L, X}) ->
             {Env_, A} = hm:freshTMeta(Env, Tvs, true, 0),
             {env:extend(X, A, Env_), A}
     end;
+btc_synth(Env, Tvs, {op, L, Op, E1, E2}) ->
+    OpType = lookup(Op, Env, L),
+    {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
+    Arg1Type = hd(hm:get_fn_args(OpenedType)),
+    Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
+    RetType = hm:get_fn_rt(OpenedType),
+    {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
+    {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
+    {Env2, RetType};
 btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
     {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
     {Env_2, RTy} = btc_synth(Env_1, Tvs, RNode),
@@ -535,7 +544,9 @@ btc_synth(Env, Tvs, Node) ->
             % ClausesCheckRes = lists:map(fun(C) -> btc_synth(Env, Tvs, C) end, Clauses),
             {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
             {Env_ , T};
-        X -> erlang:error({type_error," Cannot synthesize the type of " 
+        X ->
+            ?PRINT(Node),
+            erlang:error({type_error," Cannot synthesize the type of " 
             ++ util:to_string(Node) ++ " with node type "++ util:to_string(X)})
     end.
 
