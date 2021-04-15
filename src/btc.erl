@@ -165,14 +165,14 @@ checkSolution(Env, _M, _T) -> {Env, true}.
 unify(Env, _Tvs, A, A) -> {Env, A};
 unify(Env, _Tvs, {tvar, _, Name_A}, {tvar, _, Name_B}) when Name_A == Name_B ->
     {Env, hm:tvar(Name_A, 0)};
-unify(Env, Tvs, {funt, _, [Left_A], Right_A}, {funt, _, [Left_B], Right_B}) ->
-    {Env_, Left_U} = unify(Env, Tvs, Left_A, Left_B),
-    {Env__, Right_U} = unify(Env_, Tvs, Right_A, Right_B),
-    {Env__, hm:funt([Left_U], Right_U, 0)};
-unify(Env, Tvs, {tcon, _, Left_A, [Right_A]}, {tcon, _, Left_B, [Right_B]}) ->
-    {Env_, Left_U} = unify(Env, Tvs, Left_A, Left_B),
-    {Env__, Right_U} = unify(Env_, Tvs, Right_A, Right_B),
-    {Env__, hm:tcon(Left_U, [Right_U], 0)};
+unify(Env, Tvs, {funt, _, Args_A, Ret_A}, {funt, _, Args_B, Ret_B}) ->
+    {Env_, Args} = unifyList(Env, Tvs, Args_A, Args_B),
+    {Env__, Ret_U} = unify(Env_, Tvs, Ret_A, Ret_B),
+    {Env__, hm:funt(Args, Ret_U, 0)};
+unify(Env, Tvs, {tcon, _, Name_A, Args_A}, {tcon, _, Name_B, Args_B}) ->
+    {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B),
+    {Env_2, Args} = unifyList(Env_1, Tvs, Args_A, Args_B),
+    {Env_2, hm:tcon(Name, Args, 0)};
 unify(Env, Tvs, {forall, Name_A, _, Body_A}=A, {forall, Name_A, _, Body_A}=B) ->
     Sk = hm:freshTSkol(),
     {tSkol, _, SkId} = Sk,
@@ -194,6 +194,13 @@ unify(Env, _Tvs, A, B) ->
             io:fwrite("~n",[]),
             terr("unify failed!")
     end.
+
+unifyList(Env, Tvs, As, Bs) ->
+    lists:foldr(fun({A, B}, {Ei, Ts}) ->
+        {Ei_, T} = unify(Ei, Tvs, A, B),
+        {Ei_, Ts ++ [T]}
+    end,
+    {Env, []}, lists:zip(As, Bs)).
 
 unifyTMeta(Env, _Tvs, M, M) -> {Env, M};
 unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type /= null ->
@@ -518,10 +525,13 @@ btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
 btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
     %% TODO handle all clauses not just head
-    {Env_2 , CT} = btc_synth(Env_1, Tvs, hd(Clauses)),
+    % {Env_2 , CT} = btc_synth(Env_1, Tvs, hd(Clauses)),
+    {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
+    % CT = hd(CTs),
+    {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
     Arg1Type = hd(hm:get_fn_args(CT)),
-    {Env_3, _} = subsume(Env_2, Tvs, EType, Arg1Type),
-    {Env_3, CT};
+    {Env_4, _} = subsume(Env_3, Tvs, EType, Arg1Type),
+    {Env_4, CT};
 btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
@@ -692,9 +702,26 @@ synth_clause_patterns(Env, Tvs, [P|Ps]) ->
 
 %% this is our let
 synth_clause_body(Env, Tvs, Body) ->
-    lists:foldr(fun(Expr, Ei) ->
+    lists:foldr(
+        fun(Expr, Ei) ->
             {Ei_, _} = btc_synth(Ei, Tvs, Expr),
             Ei_
         end,
-        Env,
-        lists:droplast(Body)).
+        Env, lists:droplast(Body)).
+
+btc_synth_clauses(Env, Tvs, Clauses) ->
+    lists:foldr(
+        fun(C, {Ei, ATs}) ->
+            {Ei_, CT} = btc_synth(Ei, Tvs, C),
+            {Ei_, ATs++[CT]}
+        end,
+        {Env, []}, Clauses).
+
+subsume_clauses(Env, Tvs, ClauseTys) ->
+    C_First = hd(ClauseTys),
+    lists:foldr(
+        fun(C, {Ei, CT}) ->
+            {Ei_, CTS} = subsume(Ei, Tvs, CT, C),
+            {Ei_, CTS}
+        end,
+        {Env, C_First}, tl(ClauseTys)).
