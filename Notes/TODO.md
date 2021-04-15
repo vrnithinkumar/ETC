@@ -16,13 +16,13 @@
     - [X] (_, {string,L,_})
     - [X] (_,{char,L,_}) ->
     - [X] (_,{float,L,_}) ->
-    - [ ] (Env,{clause,L,_,_,_}=Node) ->
+    - [X] (Env,{clause,L,_,_,_}=Node) ->
     - [X] (_,{var,L,'_'}) ->
     - [ ] (Env,{var, L, X}) ->
     - [ ] (Env,{call,L,{atom,_,is_function},[F,{integer,_,Arity}]}) ->
     - [ ] (Env,{call,L,{atom,_,element},[{integer,_,N},{tuple,_,Es}]}) ->
     - [ ] (Env,{call,L,F,Args}) ->
-    - [ ] (Env,{op,L,Op,E1,E2}) ->
+    - [X] (Env,{op,L,Op,E1,E2}) ->
     - [ ] (Env,{atom,L,X}) ->
     - [ ] (Env,{'fun',L,{function,X,ArgLen}}) ->
     - [ ] (_,{nil,L}) ->

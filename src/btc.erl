@@ -419,19 +419,10 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
             % check_type_var(Env, Type, VarT),
             {Env_, VarT}
     end;
-btc_check(Env, Tvs, {match, L, _LNode, _RNode} = Node, Type) ->
-    ?PRINT(Node),
-    {ResType, InfCs, InfPs} = etc:infer(Env, Node),
-    % Solve unification constraints
-    Sub = hm:solve(InfCs),
-    Ps = hm:subPs(InfPs,Sub),
-    % predicate solving leads in a substitution since 
-    % oc predicates are basically ambiguous unification constraints
-    {Sub_, RemPs} = hm:solvePreds(rt:defaultClasses(), Ps),
-    SubdEnv = hm:subE(Env, hm:comp(Sub_, Sub)),
-    {VarT, _Ps} = etc:lookup('X', SubdEnv, L),
-    ?PRINT(VarT),
-    {SubdEnv, Type};
+btc_check(Env, Tvs, {match, L, LNode, RNode} = Node, Type) ->
+    {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
+    {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
+    subsume(Env_2, Tvs, LTy, RTy);
 btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
     OpType = lookup(Op, Env, L),
     case hm:has_type_var(OpType) of
@@ -524,6 +515,13 @@ btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
     {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
     {Env_2, RTy} = btc_synth(Env_1, Tvs, RNode),
     subsume(Env_2, Tvs, LTy, RTy);
+btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
+    {Env_1, EType} = btc_synth(Env, Tvs, Expr),
+    %% TODO handle all clauses not just head
+    {Env_2 , CT} = btc_synth(Env_1, Tvs, hd(Clauses)),
+    Arg1Type = hd(hm:get_fn_args(CT)),
+    {Env_3, _} = subsume(Env_2, Tvs, EType, Arg1Type),
+    {Env_3, CT};
 btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),

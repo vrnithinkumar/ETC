@@ -282,7 +282,8 @@ infer(Env,{atom,L,X}) ->
             end
     end;
 infer(Env,{'fun',L,{function,X,ArgLen}}) ->
-    {T, Ps} = lookup({X,ArgLen},Env,L), {T,[],Ps};
+    {T, Ps} = lookup({X,ArgLen},Env,L),
+    {T,[],Ps};
 infer(_,{nil,L}) ->
     {hm:tcon("List",[hm:fresh(L)],L),[],[]};
 infer(Env,{cons,L,H,T}) ->
