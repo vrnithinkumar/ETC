@@ -531,7 +531,8 @@ btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
     Arg1Type = hd(hm:get_fn_args(CT)),
     {Env_4, _} = subsume(Env_3, Tvs, EType, Arg1Type),
-    {Env_4, CT};
+    RetType = hm:get_fn_rt(CT),
+    {Env_4, RetType};
 btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
