@@ -394,23 +394,19 @@ btc_check(Env, Tvs, {integer,L,_}, Type) ->
     subsume(Env, Tvs, Inf, Type);
 btc_check(Env, Tvs, {string, L,_}, Type) ->
     Inf= hm:tcon("List", [hm:bt(char,L)],L),
-    subsume(Env, Tvs, Inf, Type),
-    {Env, Inf};
+    subsume(Env, Tvs, Inf, Type);
 btc_check(Env, Tvs, {char, L,_}, Type) ->
     Inf= hm:bt(char,L),
-    subsume(Env, Tvs, Inf, Type),
-    {Env, Inf};
+    subsume(Env, Tvs, Inf, Type);
 btc_check(Env, Tvs, {float,L,_}, Type) ->
     Inf = hm:bt(float, L),
-    subsume(Env, Tvs, Inf, Type),
-    {Env, Inf};
+    subsume(Env, Tvs, Inf, Type);
 btc_check(Env, Tvs, {atom,L,X}, Type) ->
     Inf = case X of
         B when is_boolean(B) -> hm:bt(boolean, L);
         _                    -> hm:bt(atom, L)
-        end,
-        subsume(Env, Tvs, Inf, Type),
-    {Env, Inf};
+    end,
+    subsume(Env, Tvs, Inf, Type);
 btc_check(Env, Tvs, {var, L, '_'}, Type) ->
     {Env, Type};
 btc_check(Env, Tvs, {var, L, X}, Type) ->
@@ -551,8 +547,10 @@ btc_synth(Env, Tvs, Node) ->
                 fun_expr -> fun_expr_clauses(Node)
             end,
             % ClausesCheckRes = lists:map(fun(C) -> btc_synth(Env, Tvs, C) end, Clauses),
-            {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
-            {Env_ , T};
+            {Env_2, CTs} = btc_synth_clauses(Env, Tvs, Clauses),
+            {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
+            % {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
+            {Env_3 , CT};
         X ->
             ?PRINT(Node),
             erlang:error({type_error," Cannot synthesize the type of " 
