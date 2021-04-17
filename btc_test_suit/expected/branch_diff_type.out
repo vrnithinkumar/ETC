@@ -1,0 +1,6 @@
+Module branch_diff_type: 
+  {foo,1} :: (atom)->atom
+  {ping,0} :: ()->float
+  {pong,0} :: ()->atom
+
+test_cases/branch_diff_type.erl:2: Warning: export_all flag enabled - all functions will be exported

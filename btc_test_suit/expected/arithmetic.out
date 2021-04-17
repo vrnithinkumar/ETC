@@ -1,0 +1,24 @@
+Module arithmetic: 
+  {iband,2} :: (integer,integer)->integer
+  {ibor,2} :: (integer,integer)->integer
+  {ibsl,2} :: (integer,integer)->integer
+  {ibsr,2} :: (integer,integer)->integer
+  {ibxor,2} :: (integer,integer)->integer
+  {idiv,2} :: (integer,integer)->integer
+  {irem,2} :: (integer,integer)->integer
+  {nadd,2} :: [Num A;].(A,A)->A
+  {ndiv,2} :: [Num A;].[Num B;].(B,A)->float
+  {nmul,2} :: [Num A;].(A,A)->A
+  {nsub,2} :: [Num A;].(A,A)->A
+
+test_cases/arithmetic.erl:9: Warning: function nadd/2 is unused
+test_cases/arithmetic.erl:11: Warning: function nsub/2 is unused
+test_cases/arithmetic.erl:13: Warning: function nmul/2 is unused
+test_cases/arithmetic.erl:15: Warning: function ndiv/2 is unused
+test_cases/arithmetic.erl:19: Warning: function idiv/2 is unused
+test_cases/arithmetic.erl:21: Warning: function irem/2 is unused
+test_cases/arithmetic.erl:23: Warning: function iband/2 is unused
+test_cases/arithmetic.erl:25: Warning: function ibor/2 is unused
+test_cases/arithmetic.erl:27: Warning: function ibxor/2 is unused
+test_cases/arithmetic.erl:29: Warning: function ibsl/2 is unused
+test_cases/arithmetic.erl:31: Warning: function ibsr/2 is unused

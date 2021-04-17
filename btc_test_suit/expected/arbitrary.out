@@ -1,0 +1,26 @@
+Module arbitrary: 
+  {foo,4} :: ((A)->B,A,C,D)->B
+  {foo1,3} :: ((A,B)->C,A,B)->C
+  {foo10,1} :: (A)->A
+  {foo12,1} :: ([char])->[char]
+  {foo14,0} :: ()->float
+  {foo15,2} :: [Num A;].(A,A)->A
+  {foo16,0} :: [Num A;].[Num B;].[Num C;].()->B
+  {foo2,2} :: (()->A,B)->A
+  {foo3,2} :: [Num A;].[Num B;].((A)->C,A)->C
+  {foo6,3} :: ((A)->B,A,A)->B
+  {foo7,4} :: [Num A;].[Num B;].((B)->B,B,C,D)->B
+  {foo8,0} :: ()->A
+
+test_cases/arbitrary.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/arbitrary.erl:5: Warning: variable 'Y' is unused
+test_cases/arbitrary.erl:5: Warning: variable 'Z' is unused
+test_cases/arbitrary.erl:9: Warning: variable 'Y' is unused
+test_cases/arbitrary.erl:23: Warning: variable 'Y' is unused
+test_cases/arbitrary.erl:24: Warning: this clause for foo6/3 cannot match because a previous clause at line 23 always matches
+test_cases/arbitrary.erl:24: Warning: variable 'X' is unused
+test_cases/arbitrary.erl:26: Warning: variable 'A' is unused
+test_cases/arbitrary.erl:26: Warning: variable 'B' is unused
+test_cases/arbitrary.erl:29: Warning: this clause for foo7/4 cannot match because a previous clause at line 26 always matches
+test_cases/arbitrary.erl:29: Warning: variable 'A' is unused
+test_cases/arbitrary.erl:29: Warning: variable 'B' is unused

@@ -1,0 +1,4 @@
+Module case_list: 
+  {f4,1} :: ([char])->char
+
+test_cases/case_list.erl:2: Warning: export_all flag enabled - all functions will be exported

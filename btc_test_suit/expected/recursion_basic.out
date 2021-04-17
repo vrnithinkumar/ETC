@@ -1,0 +1,19 @@
+Module recursion_basic: 
+  {duplicate,2} :: [Num A;].(A,B)->[B]
+  {fac,1} :: [Num A;].(A)->A
+  {foo,0} :: ()->[char]
+  {foo1,0} :: ()->A
+  {foo2,0} :: ()->A
+  {len,1} :: [Num A;].([B])->A
+  {sublist,2} :: [Num A;].([B],A)->[B]
+  {tail_duplicate,2} :: [Num A;].(A,B)->[B]
+  {tail_duplicate,3} :: [Num A;].(A,B,[B])->[B]
+  {tail_fac,1} :: [Num A;].(A)->A
+  {tail_fac,2} :: [Num A;].(A,A)->A
+  {tail_len,1} :: [Num A;].([B])->A
+  {tail_len,2} :: [Num A;].([B],A)->A
+  {tail_sublist,2} :: [Num A;].([B],A)->[B]
+  {tail_sublist,3} :: [Num A;].([B],A,[B])->[B]
+
+test_cases/recursion_basic.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/recursion_basic.erl:7: Warning: this clause for foo/0 cannot match because a previous clause at line 6 always matches

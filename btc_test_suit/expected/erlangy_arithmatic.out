@@ -1,0 +1,19 @@
+Module erlangy_arithmatic: 
+  {add,2} :: [Num A;].(A,A)->A
+  {addTestFF,0} :: ()->float
+  {addTestIF,0} :: ()->float
+  {addTestII,0} :: [Num A;].()->A
+  {addTestVars,0} :: [Num A;].()->float
+  {bar,1} :: [Num A;].(A)->A
+  {divTest,0} :: [Num A;].()->integer
+  {foo,2} :: (float,integer)->integer
+  {foo1,0} :: ()->float
+  {foo2,0} :: [Num A;].()->A
+  {foo3,0} :: ()->float
+  {foo4,0} :: ()->float
+  {foo5,2} :: (integer,integer)->integer
+  {getFloat,0} :: ()->float
+  {getInt,0} :: [Num A;].()->A
+
+test_cases/erlangy_arithmatic.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/erlangy_arithmatic.erl:14: Warning: this clause for foo4/0 cannot match because a previous clause at line 12 always matches

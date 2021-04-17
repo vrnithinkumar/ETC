@@ -1,0 +1,19 @@
+Module basic_bd_tc: 
+Same as type spec defined in lines ["4"] 
+  {f1,0} :: ()->integer
+Same as type spec defined in lines ["7"] 
+  {f2,0} :: ()->float
+Same as type spec defined in lines ["10"] 
+  {f3,0} :: ()->string
+Same as type spec defined in lines ["13"] 
+  {f4,0} :: ()->char
+Same as type spec defined in lines ["16"] 
+  {f5,0} :: ()->boolean
+Same as type spec defined in lines ["19"] 
+  {f6,0} :: ()->boolean
+Same as type spec defined in lines ["22"] 
+  {f7,1} :: (integer)->integer
+Same as type spec defined in lines ["25"] 
+  {f8,1} :: (boolean)->integer
+
+test_cases/basic_bd_tc.erl:2: Warning: export_all flag enabled - all functions will be exported

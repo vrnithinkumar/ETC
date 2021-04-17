@@ -1,0 +1,9 @@
+Module case_expr: 
+  {f1,1} :: [Num A;].[Num B;].[Num C;].(boolean)->A
+  {f2,1} :: [Num A;].[Num B;].[Num C;].(boolean)->A
+  {f3,3} :: [Num A;].(B,B,B)->A
+  {f4,4} :: [Num A;].(B,B,B,A)->A
+
+test_cases/case_expr.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/case_expr.erl:6: Warning: variable 'A' is unused
+test_cases/case_expr.erl:13: Warning: variable 'A' is unused

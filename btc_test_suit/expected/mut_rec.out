@@ -1,0 +1,8 @@
+Module mut_rec: 
+  {bar,0} :: [Num A;].()->B
+  {even,1} :: [Num A;].(A)->boolean
+  {foo,0} :: [Num A;].()->B
+  {ind,0} :: [Num A;].()->A
+  {odd,1} :: [Num A;].(A)->boolean
+
+test_cases/mut_rec.erl:2: Warning: export_all flag enabled - all functions will be exported

@@ -1,0 +1,9 @@
+Module udts: 
+  {emptyTree,0} :: ()->tree A
+  {findNode,2} :: (A,tree A)->boolean
+  {flattenTree,1} :: (tree A)->[A]
+  {nameTree,0} :: ()->tree [char]
+
+test_cases/udts.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/udts.erl:11: Warning: variable 'Lt' is unused
+test_cases/udts.erl:11: Warning: variable 'Rt' is unused

@@ -1,0 +1,6 @@
+Module function_calling: 
+  {bar,0} :: [Num A;].()->integer
+  {bar2,0} :: [Num A;].[Num B;].()->integer
+  {foo,2} :: [Num A;].(A,A)->A
+
+test_cases/function_calling.erl:2: Warning: export_all flag enabled - all functions will be exported

@@ -1,0 +1,12 @@
+Module arities: 
+  {bar,0} :: [Num A;].()->B
+  {bar,1} :: [Num A;].(A)->B
+  {foo,0} :: [Num A;].()->A
+  {foo,1} :: [Num A;].(B)->B
+  {foo,2} :: [Num A;].[Num B;].(C,D)->C
+  {foo,3} :: [Num A;].[Num B;].[Num C;].[Num D;].(E,F,G)->E
+
+test_cases/arities.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/arities.erl:10: Warning: variable 'Y' is unused
+test_cases/arities.erl:12: Warning: variable 'Z' is unused
+test_cases/arities.erl:16: Warning: variable 'X' is unused

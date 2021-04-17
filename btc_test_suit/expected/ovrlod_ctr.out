@@ -1,0 +1,13 @@
+Module ovrlod_ctr: 
+  {empty,0} :: A :~: {tree B || maybe C || myList D} ()->A
+  {ex0,0} :: [Num A;].()->tree A
+  {ex1,1} :: (maybe A)->boolean
+  {ex2,1} :: [Num A;].(maybe A)->boolean
+  {findNode,2} :: (A,tree A)->boolean
+  {flattenTree,1} :: (tree A)->[A]
+  {nameTree,0} :: ()->tree [char]
+
+test_cases/ovrlod_ctr.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/ovrlod_ctr.erl:6: Warning: type maybe(_) is unused
+test_cases/ovrlod_ctr.erl:13: Warning: variable 'Lt' is unused
+test_cases/ovrlod_ctr.erl:13: Warning: variable 'Rt' is unused

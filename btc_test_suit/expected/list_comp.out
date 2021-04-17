@@ -1,0 +1,16 @@
+Module list_comp: 
+  {append,2} :: ([A],[A])->[A]
+  {find,2} :: (A,[A])->boolean
+  {nubSorted,1} :: ([A])->[A]
+  {partition,3} :: (A,[A],{[A],[A],[A]})->{[A],[A],[A]}
+  {qsort,1} :: ([A])->[A]
+  {reverse,1} :: ([A])->[A]
+  {reverse,2} :: ([A],[A])->[A]
+  {sum,1} :: [Num A;].([A])->A
+  {sum,2} :: [Num A;].([A],A)->A
+  {tail_recursive_fib,1} :: [Num A;].[Num B;].(A)->[B]
+  {tail_recursive_fib,4} :: [Num A;].[Num B;].(B,A,A,[A])->[A]
+
+test_cases/list_comp.erl:2: Warning: export_all flag enabled - all functions will be exported
+test_cases/list_comp.erl:36: Warning: variable 'X' is unused
+test_cases/list_comp.erl:37: Warning: variable 'Xs' is unused
