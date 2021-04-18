@@ -576,15 +576,17 @@ btc_synth(Env, Tvs, {'if',_,Clauses}) ->
     {Env_2, RetType};
 btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
-    %% TODO handle all clauses not just head
-    % {Env_2 , CT} = btc_synth(Env_1, Tvs, hd(Clauses)),
     {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
-    % CT = hd(CTs),
     {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
     Arg1Type = hd(hm:get_fn_args(CT)),
     {Env_4, _} = subsume(Env_3, Tvs, EType, Arg1Type),
     RetType = hm:get_fn_rt(CT),
     {Env_4, RetType};
+btc_synth(Env, Tvs, {'receive',_,Clauses}) ->
+    {Env_1, CTs} = btc_synth_clauses(Env, Tvs, Clauses),
+    {Env_2, CT} = subsume_clauses(Env_1, Tvs, CTs),
+    RetType = hm:get_fn_rt(CT),
+    {Env_2, RetType};
 btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseGuards = clause_guard(Clause),
