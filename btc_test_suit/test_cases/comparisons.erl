@@ -18,9 +18,9 @@ cene (X,Y) -> X =/= Y.
 
 foo1() -> "hello" == "world".
 
-foo2() -> "hello" =:= 1.
+% foo2() -> "hello" =:= 1.
 
-foo3() -> 1.0 =/= 1.
+% foo3() -> 1.0 =/= 1.
 
 foo5() ->
     X = 1 div 5,

@@ -410,6 +410,10 @@ btc_check(Env, Tvs, {char, L,_}, Type) ->
 btc_check(Env, Tvs, {float,L,_}, Type) ->
     Inf = hm:bt(float, L),
     subsume(Env, Tvs, Inf, Type);
+btc_check(Env, Tvs, {nil, L}, Type) ->
+    {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
+    ListType = hm:tcon("List", [A], L),
+    subsume(Env_1, Tvs, ListType, Type);
 btc_check(Env, Tvs, {atom,L,X}, Type) ->
     Inf = case X of
         B when is_boolean(B) -> hm:bt(boolean, L);
@@ -523,6 +527,10 @@ btc_synth(Env, _Tvs, {atom,L,X}) ->
         _                    -> hm:bt(atom, L)
         end,
     {Env, Inferred};
+btc_synth(Env, Tvs, {nil, L}) ->
+    {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
+    ListType = hm:tcon("List", [A], L),
+    {Env_1, ListType};
 btc_synth(Env, Tvs, {var, L, X}) ->
     case env:is_bound(X, Env) of
         true  ->
