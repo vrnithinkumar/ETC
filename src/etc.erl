@@ -573,7 +573,7 @@ checkGaurds(Env,{tree,disjunction,_,Conjuctions}) ->
 checkGaurds(_,none) -> {[],[]}.
 
 % given a body of a clause, returns its type
--spec inferClauseBody(hm:env(),erl_syntax:syntaxTree()) -> 
+-spec inferClauseBody(hm:env(),erl_syntax:syntaxTree()) ->
     {hm:type(),[hm:constraint()],[hm:predicate()]}.
 inferClauseBody(Env,Body) -> 
     {Env_, CsBody, PsBody} = lists:foldl(

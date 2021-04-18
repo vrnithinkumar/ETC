@@ -6,7 +6,7 @@
     ,subPs/2,free/1
     ,isTVar/1]).
 -export([bt/2,funt/3,tvar/2,tcon/3,forall/4, tMeta/4, tSkol/2]).
--export([freshTMeta/3, freshTMeta/4, freshTSkol/1]).
+-export([freshTMeta/3, freshTMeta/4, freshTSkol/1, replaceFreshTMeta/2, generalizeType/1]).
 -export([freshen/1,generalize/3,eqType/2,fresh/1, specialize/2]).
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
 -export([is_same/2, isSubType/2, get_all_class_types/1]).
@@ -557,9 +557,9 @@ prettyCs([{T1,T2}|Cs],S) ->
 
 %% check types are same irrespective of line number
 is_same({bt, _, T1}, {bt, _, T2}) -> T1 == T2;
-is_same({funt, _, T1As, T1B}, {funt, _, T2As, T2B}) -> 
+is_same({funt, _, T1As, T1B}, {funt, _, T2As, T2B}) ->
     % ?PRINT(T1As), ?PRINT(T2As),
-    IsParamsMatch = case length(T1As) == length(T2As) of 
+    IsParamsMatch = case length(T1As) == length(T2As) of
         true  -> is_same_types(T1As,T2As);
         false -> false
     end,
@@ -570,7 +570,11 @@ is_same({forall, _, P1s, A1},{forall, _, P2s, A2}) ->
     is_same_predicates(P1s, P2s) and is_same(A1, A2);
 is_same(T1,{whilst,[],T2}) -> is_same(T1, T2);
 is_same({whilst,[],T1}, T2) -> is_same(T1, T2);
-is_same({whilst,P1s,A1},{whilst,P2s,A2}) -> is_same_predicates(P1s, P2s) and is_same(A1, A2);
+is_same({whilst,P1s,A1},{whilst,P2s,A2}) ->
+    is_same_predicates(P1s, P2s) and is_same(A1, A2);
+is_same({tMeta, _, Id, Tvs, Type1, Mono1}, {tMeta, _, Id, Tvs, Type2, Mono2}) ->
+    Mono1 == Mono2 and is_same(Type1, Type2);
+is_same({tSkol, _, Id}, {tSkol, _, Id}) -> true;
 is_same(T1,T2) -> io:fwrite("Wrong types ~p : ~p ",[T1, T2]), false.
 
 %% helpers
@@ -621,3 +625,52 @@ freshTMeta(Env, Tvs, Mono, L) ->
     Env_ = env:set_meta(Env, Ref, TM),
     {Env_, TM}.
 freshTMeta(Env, Tvs, L) -> freshTMeta(Env, Tvs, false, L).
+
+getAllTMeta ({bt, _, _}) -> [];
+getAllTMeta ({funt, _, Args, Ret}) ->
+    ArgTMs = lists:foldr(fun(Arg, TMs) ->
+        TMs ++ getAllTMeta(Arg)
+    end,
+    [] ,Args),
+    RetTM = getAllTMeta(Ret),
+    ArgTMs ++ RetTM;
+getAllTMeta ({tvar, _, _}) -> [];
+getAllTMeta ({tcon, _, _, Args}) ->
+    lists:foldr(fun(Arg, TMs) ->
+        TMs ++ getAllTMeta(Arg)
+    end,
+    [] ,Args);
+getAllTMeta ({forall, {tvar, _, _}, _, A}) -> getAllTMeta(A);
+getAllTMeta ({whilst, _, T}) -> getAllTMeta(T);
+getAllTMeta ({tMeta, _, _, _, _, _} = TM) -> [TM];
+getAllTMeta ({tSkol, _, _}) -> [].
+
+replaceTMeta(X, S, {tvar, _, _} = TVar) -> TVar;
+replaceTMeta({tMeta, _ , _Id, _Tvs, Type, _}, S, {tMeta, _ , _Id, _Tvs, Type, _}) ->
+    S;
+replaceTMeta(X, S, {funt, L, Args, RetTy}) ->
+    SubArgs = lists:map(fun (A) -> replaceTMeta(X, S, A) end, Args),
+    hm:funt(SubArgs, replaceTMeta(X, S, RetTy), L);
+replaceTMeta(X, S, {tcon, L, Name, Args}) ->
+    SubArgs = lists:map(fun (A) -> replaceTMeta(X, S, A) end, Args),
+    hm:tcon(replaceTMeta(X, S, Name), SubArgs, L);
+replaceTMeta(X, S, {forall, Name, Ps, Body}) ->
+    {forall, Name, Ps, replaceTMeta(X, S, Body)};
+replaceTMeta(_X, _S, T) -> T.
+
+replaceFreshTMeta(Env, Type) ->
+    AllTMs = getAllTMeta(Type),
+    NO_Dup_TMS = lists:usort(AllTMs), %% hack to avoid duplicate use set instead of list
+    lists:foldr(fun({tMeta, L, _, [], _, Mono} = TM, {Ei, Tp}) ->
+        {Ei_, NM} = hm:freshTMeta(Ei, [], Mono, L),
+        TP_ = replaceTMeta(TM, NM, Tp),
+        {Ei_, TP_}
+    end,
+    {Env, Type}, NO_Dup_TMS).
+
+generalizeType (Type) ->
+    AllTMs = lists:usort(getAllTMeta(Type)),
+    generalizeTMeta(AllTMs, Type).
+
+generalizeTMeta ([], T) -> T;
+generalizeTMeta ([TM|TMs], T) -> {forall, {tvar,getLn(T), TM}, [], generalizeTMeta(TMs, T)}.

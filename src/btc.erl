@@ -85,12 +85,12 @@ prune(Env, {forall, Name, _, Body}) ->
 prune(Env, T) -> {Env, T}.
 
 prune_list(Env, Types) ->
-    lists:foldr(fun(T, {Ei, AccTy}) ->
+    {E_, PL} = lists:foldr(fun(T, {Ei, AccTy}) ->
         {Ei_, PTy} = prune(Ei, T),
-        {Ei_, AccTy++[PTy]}
+        {Ei_, [PTy| AccTy]}
     end,
-    {Env, []},
-    Types).
+    {Env, []}, Types),
+    {E_, PL}.
 
 applyEnv(Env, {tMeta, _, Id, _, _, _}) ->
     Res = env:get_meta(Env, Id),
@@ -113,8 +113,11 @@ flattenApp(T) -> {T, []}.
 
 % when Name == X
 substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
+substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
 substTVar(X, S, {tMeta, _ , _Id, _Tvs, Type, _}) when Type /= null ->
     substTVar(X, S, Type);
+substTVar({tvar, _, {tMeta, _ , Id, _, null, M}}, S, {tMeta, _ , Id, _, null, M}) ->
+    S;
 substTVar(X, S, {funt, _, Args, RetTy}) ->
     SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
     hm:funt(SubArgs, substTVar(X, S, RetTy), 0);
@@ -123,9 +126,16 @@ substTVar(X, S, {tcon, _, Name, Args}) ->
     hm:tcon(substTVar(X, S, Name), SubArgs, 0);
 substTVar(X, S, {forall, Name, Ps, Body}) when Name /= X ->
     {forall, Name, Ps, substTVar(X, S, Body)};
-substTVar(_X, _S, T) -> T.
+substTVar(_X, _S, T) ->
+    % ?PRINT(_X),
+    % ?PRINT(_S),
+    % ?PRINT(T),
+    T.
 
 openTForall({forall, Name, _, Body}, T) ->
+    % ?PRINT(Name),
+    % ?PRINT(T),
+    % ?PRINT(Body),
     substTVar(Name, T, Body).
 
 % Subtyping
@@ -346,8 +356,6 @@ check(Env, Tvs, Term, Ty) ->
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
     {Env_, Inf} = btc_synth(Env, Tvs, Term),
-    % ?PRINT(Inf),
-    % ?PRINT(Ty),
     subsume(Env_, Tvs, Inf, Ty).
 
 %% BDTC - End %%
@@ -375,6 +383,7 @@ do_btc_infer(Env, F) ->
     FunQName = util:getFnQName(F),
     % ?PRINT(FunQName),
     {SEnv, STy} = btc_synth(Env, [], F),
+    % ?PRINT(STy),
     Ty_ = applyEnv(SEnv, STy),
     % ?PRINT(Ty_),
     % ?PRINT(env:get_meta_map(Env_)),
@@ -383,7 +392,7 @@ do_btc_infer(Env, F) ->
     % io:fwrite("~p :: ",[FunQName]),
     % showType(PTy),
     % io:fwrite("~n",[]),
-    ExtendedEnv = env:extend(FunQName, PTy, Env_),
+    ExtendedEnv = env:extend(FunQName, PTy, Env),
     % ?PRINT(Env_),
     {ExtendedEnv, PTy}.
 
@@ -410,10 +419,11 @@ btc_check(Env, Tvs, {atom,L,X}, Type) ->
 btc_check(Env, Tvs, {var, L, '_'}, Type) ->
     {Env, Type};
 btc_check(Env, Tvs, {var, L, X}, Type) ->
-    case env:is_bound(X,Env) of
+    case env:is_bound(X, Env) of
         true  ->
             VarT = lookup(X, Env, L),
-            synthAndSubsume(Env, Tvs, {var, L, X}, Type);
+            subsume(Env, Tvs, VarT, Type);
+            % synthAndSubsume(Env, Tvs, {var, L, X}, Type);
             % check_type_var(Env, Type, VarT);
         false ->
             % ?PRINT(Type),
@@ -422,6 +432,21 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
             % check_type_var(Env, Type, VarT),
             {Env_, VarT}
     end;
+btc_check(Env, Tvs, {call,L,F,Args}, Type) ->
+    FT = synthFnCall(Env, F, length(Args)),
+    Fresh_FT = hm:generalizeType(FT),
+    {Env_1, OpenedType} = open_op_type(Env, Tvs, Fresh_FT),
+    ArgTypes = hm:get_fn_args(OpenedType),
+    % Env_ = env:disableGuardExprEnv(Env),
+    {Env_2, ArgTys} = lists:foldl(
+        fun({Arg, ArgTy}, {Ei, ATs}) ->
+            {Ei_, T} = btc_check(Ei, Tvs, Arg, ArgTy),
+            {Ei_, ATs ++ [T]}
+        end
+        , {Env_1, []}, lists:zip(Args, ArgTypes)),
+    RetType = hm:get_fn_rt(OpenedType),
+    subsume(Env_2, Tvs, Type, RetType);
+    % subsume(Env_2, Tvs, RetType, Type); %TODO order we have to fix
 btc_check(Env, Tvs, {match, L, LNode, RNode} = Node, Type) ->
     {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
     {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
@@ -472,7 +497,9 @@ btc_check(Env, Tvs, Node, Type) ->
                     AccRes and Res
                 end, true, ClausesCheckRes),
             {Env, Type};
-        _ -> synthAndSubsume(Env, Tvs, Node, Type)
+        _ ->
+            io:fwrite("BTC check is not supported so using synth and subsume ~n"),
+            synthAndSubsume(Env, Tvs, Node, Type)
     end.
 
 
@@ -497,11 +524,11 @@ btc_synth(Env, _Tvs, {atom,L,X}) ->
         end,
     {Env, Inferred};
 btc_synth(Env, Tvs, {var, L, X}) ->
-    case env:is_bound(X,Env) of
-        true    ->
+    case env:is_bound(X, Env) of
+        true  ->
             T = lookup(X, Env, L),
             {Env, T};
-        false   ->
+        false ->
             {Env_, A} = hm:freshTMeta(Env, Tvs, true, 0),
             {env:extend(X, A, Env_), A}
     end;
@@ -514,6 +541,19 @@ btc_synth(Env, Tvs, {op, L, Op, E1, E2}) ->
     {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
     {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
     {Env2, RetType};
+btc_synth(Env, Tvs, {call,L,F,Args}) ->
+    FT = synthFnCall(Env, F, length(Args)),
+    Fresh_FT = hm:generalizeType(FT),
+    {Env_1, OpenedType} = open_op_type(Env, Tvs, Fresh_FT),
+    ArgTypes = hm:get_fn_args(OpenedType),
+    {Env_2, ArgTys} = lists:foldl(
+        fun({Arg, ArgTy}, {Ei, ATs}) ->
+            {Ei_, T} = btc_check(Ei, Tvs, Arg, ArgTy),
+            {Ei_, ATs ++ [T]}
+        end
+        , {Env_1,[]}, lists:zip(Args, ArgTypes)),
+    RetType = hm:get_fn_rt(OpenedType),
+    {Env_2, RetType};
 btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
     {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
     {Env_2, RTy} = btc_synth(Env_1, Tvs, RNode),
@@ -537,8 +577,10 @@ btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, L),
     % Env_3 = env:extend(Name, A, Env_2),
     Env_3 = synth_clause_body(Env_2, Tvs, ClauseBody),
-    {Env_4, _} = btc_check(Env_3, Tvs, lists:last(ClauseBody), B),
-    {Env_4, hm:funt(As, B, L)};
+    LstBdy = lists:last(ClauseBody),
+    {Env_4, _} = btc_check(Env_3, Tvs, LstBdy, B),
+    FT = hm:funt(As, B, L),
+    {Env_4, FT};
 btc_synth(Env, Tvs, Node) ->
     case type(Node) of
         Fun when Fun =:= function; Fun =:= fun_expr ->
@@ -589,20 +631,6 @@ checkClauseBody(Env, Tvs, BodyExprs, Type) ->
     % SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
     btc_check(Env, Tvs, lists:last(BodyExprs), Type).
 
-% check if the arg patters are matching.
-% given a body of a clause, returns its type
--spec inferClauseBody(hm:env(), [any()], erl_syntax:syntaxTree()) -> 
-    {hm:env(), hm:types()}.
-inferClauseBody(Env, Tvs, BodyExprs) ->
-    % TODO: We have to add support for let recursively here
-    % {Env_, CsBody, PsBody} = lists:foldl(
-    %     fun(Expr, {Ei,Csi,Psi}) -> 
-    %         {Ei_,Csi_,Psi_} = etc:checkExpr(Ei, Expr),
-    %         {Ei_, Csi ++ Csi_, Psi ++ Psi_}
-    %     end, {Env,[],[]}, lists:droplast(BodyExprs)),
-    % SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
-    btc_synth(Env, Tvs, lists:last(BodyExprs)).
-
 % -spec localConstraintSolver(hm:env(), [hm:constraint()], [hm:predicate()]) ->
 %     hm:env().
 % localConstraintSolver(Env, InfCs, InfPs) -> 
@@ -610,6 +638,13 @@ inferClauseBody(Env, Tvs, BodyExprs) ->
 %     Ps = hm:subPs(InfPs, Sub),
 %     {Sub_, _RemPs}   = hm:solvePreds(rt:defaultClasses(), Ps),
 %     hm:subE(Env, hm:comp(Sub_, Sub)).
+
+synthFnCall(Env,{atom,L,X},ArgLen) ->
+    lookup({X,ArgLen},Env,L);
+synthFnCall(Env,{remote,L,{atom,_,Module},{atom,_,X}},ArgLen) ->
+    lookupRemote({X,ArgLen},Env,L,Module);
+synthFnCall(Env,X,_) ->
+    ?PRINT(X).
 
 %% Look up for function type and specialize
 -spec lookup(hm:tvar(),hm:env(),integer()) -> hm:type().
@@ -637,20 +672,20 @@ lookup_(X,Env,L) ->
         T         -> T
     end.
 
-% lookupRemote(X,Env,L,Module) ->
-%     case env:lookupRemote(Module, X, Env) of
-%         undefined   ->
-%                 erlang:error({type_error,util:to_string(X) ++ 
-%                             " on line " ++ util:to_string(L) ++ 
-%                             " is not exported by module " ++ util:to_string(Module)});
-%         na          ->
-%             {_,ArgLen} = X,
-%             ArgTypes = lists:map(fun hm:fresh/1, lists:duplicate(ArgLen,L)),
-%             {hm:funt(ArgTypes,hm:fresh(L),L),[]};
-%         T           -> 
-%             {FT,Ps} = hm:freshen(T), 
-%             {hm:replaceLn(FT,0,L),Ps}
-%     end.
+lookupRemote(X,Env,L,Module) ->
+    case env:lookupRemote(Module, X, Env) of
+        undefined   ->
+                erlang:error({type_error,util:to_string(X) ++ 
+                            " on line " ++ util:to_string(L) ++ 
+                            " is not exported by module " ++ util:to_string(Module)});
+        na          ->
+            {_,ArgLen} = X,
+            ArgTypes = lists:map(fun hm:fresh/1, lists:duplicate(ArgLen,L)),
+            {hm:funt(ArgTypes,hm:fresh(L),L),[]};
+        T           -> 
+            {FT,Ps} = hm:freshen(T), 
+            {hm:replaceLn(FT,0,L),Ps}
+    end.
 
 check_type_var(Env, Type, Inferred)->
 case hm:is_type_var(Type) of
@@ -670,13 +705,15 @@ end.
 
 open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
     {Env_1, M} = hm:freshTMeta(Env, Tvs, true, 0), % TODO:why true no idea?
-    Env_2 = case C of 
+    Env_2 = case C of
         [{class, CName, _ }] ->
             CUT = type_class_to_union(CName),
             udpate_tmeta_type(Env_1, M, CUT);
         _ -> Env_1
     end,
     Opened = openTForall(Ty, M),
+    % ?PRINT(M),
+    % ?PRINT(Opened),
     open_op_type(Env_2, Tvs, Opened);
 open_op_type(Env, _, OpType) ->
     {Env, OpType}.
