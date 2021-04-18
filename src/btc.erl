@@ -558,6 +558,14 @@ btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
     {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
     {Env_2, RTy} = btc_synth(Env_1, Tvs, RNode),
     subsume(Env_2, Tvs, LTy, RTy);
+btc_synth(Env, _Tvs, {'fun',L,{function,X,ArgLen}}) ->
+    T = lookup({X,ArgLen}, Env, L),
+    {Env, T};
+btc_synth(Env, Tvs, {'if',_,Clauses}) ->
+    {Env_1, CTs} = btc_synth_clauses(Env, Tvs, Clauses),
+    {Env_2, CT} = subsume_clauses(Env_1, Tvs, CTs),
+    RetType = hm:get_fn_rt(CT),
+    {Env_2, RetType};
 btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
     %% TODO handle all clauses not just head
@@ -571,9 +579,11 @@ btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_4, RetType};
 btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     ClausePatterns = clause_patterns(Clause),
+    ClauseGuards = clause_guard(Clause),
+    Env_ = guardBoolCheck(Env, Tvs, ClauseGuards),
     ClauseBody = clause_body(Clause),
     % {Env_1, A} = btc_synth(Env, Tvs, hd(ClausePatterns)),
-    {Env_1, As} = synth_clause_patterns(Env, Tvs, ClausePatterns),
+    {Env_1, As} = synth_clause_patterns(Env_, Tvs, ClausePatterns),
     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, L),
     % Env_3 = env:extend(Name, A, Env_2),
     Env_3 = synth_clause_body(Env_2, Tvs, ClauseBody),
@@ -780,3 +790,16 @@ funcSkelton(Env, Func)->
     {Env, []},lists:seq(1, ArgLen)),
     {Env_2, RetM} = hm:freshTMeta(Env_1, [], false, L),
     {Env_2, hm:funt(ATMs, RetM, L)}.
+
+guardBoolCheck(Env, Tvs, {tree, disjunction, _, Conjuctions}) ->
+    lists:foldr(fun({tree, conjunction, _, Exprs}, Ei) ->
+        checkGuardExpr(Ei, Tvs, Exprs)
+   end, Env, Conjuctions);
+guardBoolCheck(Env, _, none) -> Env.
+
+checkGuardExpr(Env, Tvs, Exprs)->
+    lists:foldr(fun(Expr, Ei) ->
+        {Env_1, InfT} = btc_synth(env:enableGuardExprEnv(Ei), Tvs, Expr),
+        {Env_2, _} = subsume(Env_1, Tvs, InfT, hm:bt(boolean, 0)),
+        Env_2
+    end, Env, Exprs).
