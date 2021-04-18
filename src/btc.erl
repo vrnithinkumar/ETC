@@ -9,7 +9,7 @@
     type/1
 ]).
 
--export([type_check/2]).
+-export([type_check/2, addFuncSkeltons/2]).
 
 %% PRINT Debugging macro%%
 -ifndef(PRINT).
@@ -761,3 +761,22 @@ subsume_clauses(Env, Tvs, ClauseTys) ->
             {Ei_, CTS}
         end,
         {Env, C_First}, tl(ClauseTys)).
+
+addFuncSkeltons(Env, Functions)->
+    FreshEnv = lists:foldl(fun(F,AccEnv) ->
+        {Env_, FT} = funcSkelton(AccEnv, F),
+        FunQName = util:getFnQName(F), 
+        env:extend(FunQName, FT, Env_)
+    end, Env, Functions),
+    FreshEnv.
+
+funcSkelton(Env, Func)->
+    ArgLen = util:getFnArgLen(Func),
+    L = util:getLn(Func),
+    {Env_1, ATMs} = lists:foldr(fun(_, {Ei, ArgTs}) ->
+        {Ei_, NM} = hm:freshTMeta(Ei, [], false, L),
+        {Ei_, ArgTs ++ [NM]}
+    end,
+    {Env, []},lists:seq(1, ArgLen)),
+    {Env_2, RetM} = hm:freshTMeta(Env_1, [], false, L),
+    {Env_2, hm:funt(ATMs, RetM, L)}.

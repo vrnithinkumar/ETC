@@ -178,6 +178,7 @@ inferOrCheck(Env, F, {AccCs, AccPs}) ->
 
 
 btc_typeCheckSCC(Functions, Env) ->
+    FreshEnv = btc:addFuncSkeltons(Env, Functions),
     %% Add all specs to Env
     EnvWithSpec = lists:foldl(fun(F, AccEnv) ->
         FunQName = util:getFnQName(F),
@@ -188,7 +189,7 @@ btc_typeCheckSCC(Functions, Env) ->
                 env:extend(FunQName, FT, AccEnv);
             false -> AccEnv
         end
-    end, Env, Functions),
+    end, FreshEnv, Functions),
     {CheckedEnv, _Types} = lists:foldl(fun(F, {AccEnv, Ts}) ->
         % inferOrCheck(FreshEnv, F, AccCsPs)
         {E, T} = btc:type_check(AccEnv, F),
