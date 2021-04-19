@@ -502,7 +502,7 @@ btc_check(Env, Tvs, Node, Type) ->
                 end, true, ClausesCheckRes),
             {Env, Type};
         _ ->
-            io:fwrite("BTC check is not supported so using synth and subsume ~n"),
+            io:fwrite("BTC check is not supported, so    using synth and subsume ~n"),
             synthAndSubsume(Env, Tvs, Node, Type)
     end.
 
@@ -531,6 +531,15 @@ btc_synth(Env, Tvs, {nil, L}) ->
     {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
     ListType = hm:tcon("List", [A], L),
     {Env_1, ListType};
+btc_synth(Env, Tvs, {cons, L, Head, Tail}) ->
+    {Env_1, HType} = btc_synth(Env, Tvs, Head),
+    {Env_2, TType} = btc_synth(Env_1, Tvs, Tail),
+    % generate a fresh "List"
+    {Env_3, A} = hm:freshTMeta(Env_2, Tvs, L),
+    LType = hm:tcon("List", [A], L),
+    {Env_4, _AU} = subsume(Env_3, Tvs, A, HType),
+    {Env_5, _LU} = subsume(Env_4, Tvs, LType, TType),
+    {Env_5, LType};
 btc_synth(Env, Tvs, {var, L, X}) ->
     case env:is_bound(X, Env) of
         true  ->
