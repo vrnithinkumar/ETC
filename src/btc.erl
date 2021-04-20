@@ -550,6 +550,14 @@ btc_synth(Env, Tvs, {cons, L, Head, Tail}) ->
     {Env_4, _AU} = subsume(Env_3, Tvs, A, HType),
     {Env_5, _LU} = subsume(Env_4, Tvs, LType, TType),
     {Env_5, LType};
+btc_synth(Env, Tvs, {tuple, L, Es}) ->
+    {Env_, TTs} = lists:foldl(
+        fun(X, {Ei, AccT}) -> 
+            {Ei_, T} = btc_synth(Ei, Tvs, X),
+            {Ei_, AccT ++ [T]}
+        end, {Env,[]}, Es),
+    TupleType = hm:tcon("Tuple", TTs, L),
+    {Env_, TupleType};
 btc_synth(Env, Tvs, {var, L, X}) ->
     case env:is_bound(X, Env) of
         true  ->
