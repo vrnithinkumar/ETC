@@ -12,6 +12,7 @@
 -export([is_same/2, isSubType/2, get_all_class_types/1]).
 -export([has_type_var/1, is_type_var/1, type_without_bound/1]).
 -export([get_fn_args/1, get_fn_rt/1]).
+-export([getListType/2]).
 -export_type([constraint/0,type/0]).
 
 -type tvar() :: any().
@@ -674,3 +675,11 @@ generalizeType (Type) ->
 
 generalizeTMeta ([], T) -> T;
 generalizeTMeta ([TM|TMs], T) -> {forall, {tvar,getLn(T), TM}, [], generalizeTMeta(TMs, T)}.
+
+getListType(_Env, {tcon, _, "List", [LType]}) ->
+    LType;
+getListType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
+    {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
+    getListType(Env, Type);
+getListType(_Env, _Type) ->
+    erlang:error({type_error, "Not a valid list type"}).

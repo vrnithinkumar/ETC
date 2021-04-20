@@ -227,6 +227,9 @@ unifyTMeta(Env, Tvs, {tMeta, _, Id, _, _, Mono}=M, T) ->
         false -> 
             terr("unifyTMeta failed: " ++ showType(M) ++ ":=" ++ showType(T))
 end.
+% unifyTMeta(Env, Tvs, M, T) ->
+%     ?PRINT(T),
+%     ?PRINT(M).
 
 subsume(Env, Tvs, Inf, {forall,_, _, _}=Ty) ->
     Sk = hm:freshTSkol(),
@@ -236,6 +239,8 @@ subsume(Env, Tvs, {forall, _, _, _}=Inf, Ty) ->
     {Env_, M} = hm:freshTMeta(Env, Tvs, 0),
     unify(Env_, Tvs, openTForall(Inf, M), Ty);
 subsume(Env, Tvs, Inf, Ty) ->
+    % ?PRINT(Inf),
+    % ?PRINT(Ty),
     unify(Env, Tvs, Inf, Ty).
 
 % Inference/ Synthesis
@@ -410,16 +415,21 @@ btc_check(Env, Tvs, {char, L,_}, Type) ->
 btc_check(Env, Tvs, {float,L,_}, Type) ->
     Inf = hm:bt(float, L),
     subsume(Env, Tvs, Inf, Type);
-btc_check(Env, Tvs, {nil, L}, Type) ->
-    {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
-    ListType = hm:tcon("List", [A], L),
-    subsume(Env_1, Tvs, ListType, Type);
 btc_check(Env, Tvs, {atom,L,X}, Type) ->
     Inf = case X of
         B when is_boolean(B) -> hm:bt(boolean, L);
         _                    -> hm:bt(atom, L)
     end,
     subsume(Env, Tvs, Inf, Type);
+btc_check(Env, Tvs, {nil, L}, Type) ->
+    {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
+    ListType = hm:tcon("List", [A], L),
+    subsume(Env_1, Tvs, ListType, Type);
+btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
+    {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
+    ElemTy = hm:getListType(Env_1, TType),
+    {Env_2, _HT} = btc_check(Env_1, Tvs, Head, ElemTy),
+    {Env_2, Type};
 btc_check(Env, Tvs, {var, L, '_'}, Type) ->
     {Env, Type};
 btc_check(Env, Tvs, {var, L, X}, Type) ->
@@ -502,7 +512,7 @@ btc_check(Env, Tvs, Node, Type) ->
                 end, true, ClausesCheckRes),
             {Env, Type};
         _ ->
-            io:fwrite("BTC check is not supported, so    using synth and subsume ~n"),
+            io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
             synthAndSubsume(Env, Tvs, Node, Type)
     end.
 
@@ -607,6 +617,7 @@ btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     % Env_3 = env:extend(Name, A, Env_2),
     Env_3 = synth_clause_body(Env_2, Tvs, ClauseBody),
     LstBdy = lists:last(ClauseBody),
+    % ?PRINT(LstBdy),
     {Env_4, _} = btc_check(Env_3, Tvs, LstBdy, B),
     FT = hm:funt(As, B, L),
     {Env_4, FT};
