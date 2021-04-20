@@ -12,7 +12,7 @@
 -export([is_same/2, isSubType/2, get_all_class_types/1]).
 -export([has_type_var/1, is_type_var/1, type_without_bound/1]).
 -export([get_fn_args/1, get_fn_rt/1]).
--export([getListType/2]).
+-export([getListType/2, getTupleType/2, metaTupleTypeOfN/3]).
 -export_type([constraint/0,type/0]).
 
 -type tvar() :: any().
@@ -683,3 +683,19 @@ getListType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
     getListType(Env, Type);
 getListType(_Env, _Type) ->
     erlang:error({type_error, "Not a valid list type"}).
+
+metaTupleTypeOfN(Env, N, L)->
+    {Env_, TTs } =lists:foldr(fun(_C, {Ei, TMs}) ->
+        {Ei_, NM} = hm:freshTMeta(Ei, [], false, L),
+        {Ei_, TMs ++ [NM]}
+    end, {Env, []}, lists:seq(1, N)),
+    TupleType = hm:tcon("Tuple", TTs, L),
+    {Env_, TupleType}.
+
+getTupleType(_Env, {tcon, _, "Tuple", TTys}) ->
+    TTys;
+getTupleType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
+    {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
+    getListType(Env, Type);
+getTupleType(_Env, _Type) ->
+    erlang:error({type_error, "Not a valid tuple type"}).

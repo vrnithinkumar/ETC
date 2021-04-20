@@ -430,6 +430,16 @@ btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
     ElemTy = hm:getListType(Env_1, TType),
     {Env_2, _HT} = btc_check(Env_1, Tvs, Head, ElemTy),
     {Env_2, Type};
+btc_check(Env, Tvs, {tuple, L, Es}, Type) ->
+    % TODO verify how it works with proper type
+    {Env_1, MetaTup} = hm:metaTupleTypeOfN(Env, length(Es), L),
+    TTys = hm:getTupleType(Env_1, MetaTup),
+    {Env_2, _TTs} = lists:foldl(
+        fun({E, TT}, {Ei, AccT}) ->
+            {Ei_, T} = btc_check(Ei, Tvs, E, TT),
+            {Ei_, AccT ++ [T]}
+        end, {Env_1,[]}, lists:zip(Es, TTys)),
+    subsume(Env_2, Tvs, MetaTup, Type);
 btc_check(Env, Tvs, {var, L, '_'}, Type) ->
     {Env, Type};
 btc_check(Env, Tvs, {var, L, X}, Type) ->
