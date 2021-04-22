@@ -11,7 +11,7 @@
 -export([getLn/1,pretty/1,prettyCs/2,prettify/2,replaceLn/2, replaceLn/3]).
 -export([is_same/2, isSubType/2, get_all_class_types/1]).
 -export([has_type_var/1, is_type_var/1, type_without_bound/1]).
--export([get_fn_args/1, get_fn_rt/1]).
+-export([get_fn_args/1, get_fn_rt/1, generalizeSpecT/2]).
 -export([getListType/2, getTupleType/2, metaTupleTypeOfN/3]).
 -export_type([constraint/0,type/0]).
 
@@ -644,7 +644,8 @@ getAllTMeta ({tcon, _, _, Args}) ->
 getAllTMeta ({forall, {tvar, _, _}, _, A}) -> getAllTMeta(A);
 getAllTMeta ({whilst, _, T}) -> getAllTMeta(T);
 getAllTMeta ({tMeta, _, _, _, _, _} = TM) -> [TM];
-getAllTMeta ({tSkol, _, _}) -> [].
+getAllTMeta ({tSkol, _, _}) -> [];
+getAllTMeta (NotSupported) -> ?PRINT(NotSupported), [].
 
 replaceTMeta(X, S, {tvar, _, _} = TVar) -> TVar;
 replaceTMeta({tMeta, _ , _Id, _Tvs, Type, _}, S, {tMeta, _ , _Id, _Tvs, Type, _}) ->
@@ -699,3 +700,13 @@ getTupleType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
     getListType(Env, Type);
 getTupleType(_Env, _Type) ->
     erlang:error({type_error, "Not a valid tuple type"}).
+
+generalizeSpecT (Type,Env) ->
+    MonoVars = free(Type),
+    BoundInEnv = env:freeInEnv(Env),
+    Generalizable = sets:subtract(MonoVars, BoundInEnv),
+    bindTV(sets:to_list(Generalizable),Type).
+
+% bind generalized variables
+bindTV ([],T)      -> T;
+bindTV ([X|Xs],T)  -> {forall, {tvar,getLn(T), X}, [], bindTV(Xs,T)}.
