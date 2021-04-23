@@ -48,4 +48,6 @@ hasUserSpecifiedSpec(Spec, X) ->
 
 getFirstSpecType(Spec, X) ->
     SpecTs = lookup(X, Spec),
-    hd(SpecTs).
+    % hd(SpecTs).
+    % Have to fixe multi spec type for same func
+    SpecTs.

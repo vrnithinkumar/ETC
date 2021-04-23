@@ -58,19 +58,22 @@ parse_transform(Forms,_) ->
     % add erlang module as the expected one.
     Mods = pp:getImprtdMods(Forms) ++ [erlang],
     dm:type_check_mods(Mods,File),
-    % Get specs
-    Specs = pp:getSpecs(Forms),
-    Spec = getSpecWithAllFuns(Specs),
-    EnvWithSpecs = env:addSpecs(env:default(), Spec),
+
     % add UDTs to default env
     UDTs = pp:getUDTs(Forms),
     Env0 = lists:foldl(fun(UDT,AccEnv) ->
-        addUDTNode(UDT,AccEnv) 
-    end, EnvWithSpecs, UDTs),
+        convertUDT(AccEnv, UDT)
+    end, env:default(), UDTs),
+
+    % Get specs
+    Specs = pp:getSpecs(Forms),
+    Spec = getSpecWithAllFuns(Env0, Specs),
+    EnvWithSpecs = env:addSpecs(Env0, Spec),
+
     % add all user defined records
     Env1 = lists:foldl(fun(Rec,AccEnv) ->
         addRec(Rec,AccEnv) 
-    end, Env0, pp:getRecs(Forms)),
+    end, EnvWithSpecs, pp:getRecs(Forms)),
     % add all depend external module functions
     Env = lists:foldl(fun(Mod, AccEnv) ->
         env:addExtModuleBindings(AccEnv, Mod)
@@ -90,8 +93,9 @@ parse_transform(Forms,_) ->
             env:dumpModuleBindings(Env_, Module),
             io:fwrite("Module ~p: ~n",[Module]),
             SortedBinds = lists:sort(env:readModuleBindings(Module)),
-            lists:map(fun({X,T}) -> 
-                checkWithSpec(Spec, X, T),
+            lists:map(fun({X,T}) ->
+                % TODO- VR we have to see
+                % checkWithSpec(Spec, X, T),
                 io:fwrite("  ~p :: ",[X]), 
                 hm:pretty(T), 
                 io:fwrite("~n",[])
@@ -107,16 +111,22 @@ parse_transform_stdlib(Forms) ->
     File = pp:getFile(Forms),
     Mods = pp:getImprtdMods(Forms),
     dm:type_check_mods(Mods,File),
+    % add UDTs to default env
+    UDTs = pp:getUDTs(Forms),
+    Env0 = lists:foldl(fun(UDT,AccEnv) ->
+        convertUDT(AccEnv, UDT)
+    end, env:default(), UDTs),
+
     % Get specs
     Specs = pp:getSpecs(Forms),
-    SpecTypes = getSpecWithAllFuns(Specs),
-    % add UDTs to default env
+    SpecTypes = getSpecWithAllFuns(Env0, Specs),
+    % we have to handle UDTs form lib
     env:dumpModuleSpecs(SpecTypes, Module),
     io:fwrite("Library Module:- ~p ~n",[Module]),
     lists:map(fun({X,T}) -> 
         io:fwrite("  ~p :: ",[X]),
-        [Head | _Tail] = T ,
-        hm:pretty(Head), 
+        % [Head | _Tail] = T ,
+        hm:pretty(T), 
         io:fwrite("~n",[])
     end, env:readModuleSpecs(Module)),
     io:fwrite("~n",[]),
@@ -736,7 +746,7 @@ addUDT({TypeConstr,DataConstrs,Args},Env,L) ->
     lists:foldl(fun({DConstr,DConstrType}, AccEnv) ->
         PolyDConstrType = hm:generalize(DConstrType,Env,[]),
         env:extendConstr(DConstr,PolyDConstrType,AccEnv)
-    end, Env, getConstrTypes(Type, DataConstrs)). 
+    end, Env, getConstrTypes(Type, DataConstrs)).
 
 % returns a list of Env entries - one for each data constructor
 -spec getConstrTypes(hm:type(),erl_syntax:syntaxTree()) -> [{var(),hm:type()}].
@@ -782,6 +792,8 @@ node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
     end, maps:new(), CTypes),
     NT = applyConstraints(FunT, CTMap),
     NT;
+node2type({type, L, nonempty_list, Args}) ->
+    hm:tcon("List", lists:map(fun node2type/1, Args), L);
 node2type({atom,_L,true}) -> 
     hm:bt(boolean,0);
 node2type({atom,_L,false}) -> 
@@ -790,7 +802,7 @@ node2type({atom,_L, atom}) ->
     hm:bt(atom,0);
 node2type({atom,_L, _}) -> 
     hm:bt(atom,0);
-node2type(Node) -> 
+node2type(Node) ->
     ?PRINT(Node),
     hm:bt(any, 0).
 
@@ -901,12 +913,17 @@ getDefaultValue(T) ->
     {nothing}.
 
 %% Spec parsing
-getSpecWithAllFuns(Specs) ->
-    SpecFns = lists:map(fun(Spec) -> specToType(element(4, Spec)) end, Specs),
+getSpecWithAllFuns(Env, Specs) ->
+    SpecFns = lists:map(fun(Spec) -> specToType(Env, element(4, Spec)) end, Specs),
     spec:add_functions(SpecFns, spec:empty()).
 
-specToType({QFName, Types}) ->
-    {QFName, lists:map(fun node2type/1, Types)}.
+specToType(Env, {QFName, Types}) ->
+    % {QFName, lists:map(fun node2type/1, Types)}.
+    % We have to see how to handle multiple functions
+    SpecT = hd(lists:map(fun node2type/1, Types)),
+    InPlaced = hm:inplaceUDT(Env, SpecT),
+    % ?PRINT(InPlaced),
+    {QFName, InPlaced}.
 
 checkWithSpec(Spec, X, T) ->
     SpecTs = spec:lookup(X, Spec),
@@ -920,3 +937,15 @@ checkWithSpec(Spec, X, T) ->
             false -> io:fwrite("Different from type defined in lines ~p ~n", [Lines])
         end
     end.
+
+
+convertUDT(Env, Node) ->
+    {TypeConstr,DataConstrs,Args} = element(4, Node),
+    L = util:getLn(Node),
+    % make type constructor
+    Type = hm:tcon(TypeConstr,lists:map(fun node2type/1, Args),L),
+    CtrType = node2type(DataConstrs),
+    % GenType = hm:generalizeSpecT(Env, Type),
+    % GenCtrType = hm:generalizeSpecT(Env, CtrType),
+    % add every data constructor to Env
+    env:extendUDT(TypeConstr,{Type, CtrType}, Env).

@@ -197,6 +197,8 @@ unify(Env, _Tvs, A, B) ->
     case hm:isSubType(A, B) of
         true-> {Env, A};
         false ->
+            ?PRINT(A),
+            ?PRINT(B),
             io:fwrite("unify failed with types ",[]),
             showType(A),
             io:fwrite(" :=: ",[]),
@@ -375,8 +377,10 @@ type_check(Env, F) ->
     end.
 
 do_btc_check(Env, F, SpecFT) ->
-    % FunQName = util:getFnQName(F),
-    {Env_, Type} = btc_check(Env, [], F, SpecFT),
+    FunQName = util:getFnQName(F),
+    UdtInTy = hm:inplaceUDT(Env, SpecFT),
+    GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
+    {Env_, Type} = btc_check(Env, [], F, GenSpecT),
     {Env_, Type}.
     % case Result of
     %     false -> erlang:error({type_error
@@ -505,8 +509,9 @@ btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     %         ARes and Res
     %     end, true, PatResults),
     % ClauseGuards = clause_guard(Node),
-    BodyType = hm:get_fn_rt(Type),
-    {Env_, BodyRes, _} = checkClauseBody(Env, Tvs, ClauseBody, BodyType),
+    {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
+    BodyType = hm:get_fn_rt(OpenedType),
+    {Env_, BodyRes} = checkClauseBody(Env_1, Tvs, ClauseBody, BodyType),
     {Env_, Type};
 btc_check(Env, Tvs, Node, Type) ->
     case type(Node) of
@@ -516,10 +521,11 @@ btc_check(Env, Tvs, Node, Type) ->
                 fun_expr -> fun_expr_clauses(Node)
             end,
             ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, Tvs, C, Type) end, Clauses),
-            Result = lists:foldl(
-                fun({_Env, Res, _T}, AccRes) ->
-                    AccRes and Res
-                end, true, ClausesCheckRes),
+            % ?PRINT(ClausesCheckRes),
+            % Result = lists:foldl(
+            %     fun({_Env, Res, _T}, AccRes) ->
+            %         AccRes and Res
+            %     end, true, ClausesCheckRes),
             {Env, Type};
         _ ->
             io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
@@ -677,8 +683,6 @@ btc_synth(Env, Tvs, Node) ->
 
 % check if the arg patters are matching.
 % given a body of a clause, returns its type
--spec checkClauseBody(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) -> 
-    {hm:env(), boolean(), hm:type()}.
 checkClauseBody(Env, Tvs, BodyExprs, Type) ->
     % TODO: We have to add support for let recursively here
     % {Env_, CsBody, PsBody} = lists:foldl(
@@ -739,11 +743,10 @@ lookupRemote(X,Env,L,Module) ->
         na          ->
             {_,ArgLen} = X,
             ArgTypes = lists:map(fun hm:fresh/1, lists:duplicate(ArgLen,L)),
-            {hm:funt(ArgTypes,hm:fresh(L),L),[]};
-        T           -> 
-            {FT,Ps} = hm:freshen(T), 
-            {hm:replaceLn(FT,0,L),Ps}
+            hm:funt(ArgTypes,hm:fresh(L),L);
+        T           -> T
     end.
+
 
 check_type_var(Env, Type, Inferred)->
 case hm:is_type_var(Type) of

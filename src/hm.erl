@@ -13,6 +13,7 @@
 -export([has_type_var/1, is_type_var/1, type_without_bound/1]).
 -export([get_fn_args/1, get_fn_rt/1, generalizeSpecT/2]).
 -export([getListType/2, getTupleType/2, metaTupleTypeOfN/3]).
+-export([inplaceUDT/2]).
 -export_type([constraint/0,type/0]).
 
 -type tvar() :: any().
@@ -701,12 +702,37 @@ getTupleType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
 getTupleType(_Env, _Type) ->
     erlang:error({type_error, "Not a valid tuple type"}).
 
-generalizeSpecT (Type,Env) ->
+generalizeSpecT (Env, Type) ->
     MonoVars = free(Type),
-    BoundInEnv = env:freeInEnv(Env),
-    Generalizable = sets:subtract(MonoVars, BoundInEnv),
-    bindTV(sets:to_list(Generalizable),Type).
+    % BoundInEnv = env:freeInEnv(Env),
+    % Generalizable = sets:subtract(MonoVars, BoundInEnv),
+    bindTV(sets:to_list(MonoVars),Type).
 
 % bind generalized variables
 bindTV ([],T)      -> T;
 bindTV ([X|Xs],T)  -> {forall, {tvar,getLn(T), X}, [], bindTV(Xs,T)}.
+
+inplaceUDT (Env, {bt, _, _} =T ) -> T;
+inplaceUDT (Env, {funt, L, Args, Ret}) ->
+    Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
+    Ret_ = inplaceUDT(Env, Ret),
+    {funt, L, Args_, Ret_};
+inplaceUDT (Env, {tvar, L, _}=T) -> T;
+inplaceUDT (Env, {tcon, L, Name, Args} = T) ->
+    case env:lookupUDT(Name, Env) of
+        [{A, B}] -> inplaceTCon(T, B);
+        []       -> T
+    end;
+inplaceUDT (Env, {forall, TV, Ps, A}) ->
+    {forall, TV, Ps, inplaceUDT(Env, A)};
+inplaceUDT (Env, {whilst, L, T}) ->
+    {whilst, L, inplaceUDT(Env, T)};
+inplaceUDT (Env, {tMeta, L, Id, Tvs, Type, M}) when Type /= null ->
+    {tMeta, L, Id, Tvs, inplaceUDT(Env, Type), M};
+inplaceUDT (Env, {tMeta, _, _, _, _, _} = T) -> T;
+inplaceUDT (Env, {tSkol, _, _} = T) -> T.
+
+inplaceTCon({tcon, A_L, A_Name, A_Args}, {tcon, B_L, B_Name, B_Args})->
+    {tcon, A_L, B_Name, A_Args};
+inplaceTCon({tcon, A_L, A_Name, A_Args}, T)->
+        T.
