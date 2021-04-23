@@ -11,6 +11,7 @@
         ,printExtBindings/1, dumpModuleSpecs/2
         ,lookup_type_var/2, extend_type_var/3
         ,set_meta/3, get_meta/2, get_meta_map/1
+        ,extendUDT/3, lookupUDT/2
         ,readModuleSpecs/1, lookup_spec_binding/2, addSpecs/2, getSpecs/1]).
 
 -export_type([env/0]).
@@ -27,6 +28,7 @@
         type_var_bindings = [],
         specs_env         = spec:empty(),
         constructors      = [],
+        udts              = [],
         recFieldMap       = [],
         guardExpr         = [],
         metaMap           = #{}, % hack to store meta var state
@@ -76,11 +78,15 @@ isGuardExprEnabled(Env) -> Env#ten.isGuardExpr.
 
 extendConstr(X,A,Env) -> Env#ten{constructors = [{X,A} | Env#ten.constructors]}.
 
+extendUDT(X,A,Env) -> Env#ten{udts = [{X,A} | Env#ten.udts]}.
+
 free(X,Env) -> Env#ten{bindings = proplists:delete(X,Env#ten.bindings)}.
 
 fmapV(F,Env) -> Env#ten{bindings = lists:map(fun ({Var,Type}) -> {Var,F(Type)} end, Env#ten.bindings)}.
 
 lookupConstrs(X,Env) -> proplists:get_all_values(X,Env#ten.constructors).
+
+lookupUDT(X,Env) -> proplists:get_all_values(X,Env#ten.udts).
 
 %%%%%%%%% Records
 
