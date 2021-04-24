@@ -93,15 +93,20 @@ prune_list(Env, Types) ->
     {E_, PL}.
 
 applyEnv(Env, {tMeta, _, Id, _, _, _}) ->
-    Res = env:get_meta(Env, Id),
-    Res;
-applyEnv(Env, {funt, _, As, Right}) ->
-    As_ = lists:map(fun(A) -> applyEnv(Env, A) end, As),
-    hm:funt(As_, applyEnv(Env, Right), 0);
-applyEnv(Env, {tcon, _, Left, [Right]}) -> 
-    hm:tcon(applyEnv(Env, Left), [applyEnv(Env, Right)], 0);
-applyEnv(Env, {forall, Name, _, Body}) -> 
-    {forall, Name, [], applyEnv(Env, Body)};
+    % ?PRINT(Id),
+    {tMeta, L, Id, Tvs, Type, Mono} = env:get_meta(Env, Id),
+    case Type of
+        null -> {tMeta, L, Id, Tvs, Type, Mono};
+        _    -> {tMeta, L, Id, Tvs, applyEnv(Env, Type), Mono}
+    end;
+applyEnv(Env, {funt, _, Args, Ret}) ->
+    As_ = lists:map(fun(A) -> applyEnv(Env, A) end, Args),
+    hm:funt(As_, applyEnv(Env, Ret), 0);
+applyEnv(Env, {tcon, _, Name, Args}) -> 
+    As_ = lists:map(fun(A) -> applyEnv(Env, A) end, Args),
+    hm:tcon(applyEnv(Env, Name), As_, 0);
+applyEnv(Env, {forall, Name, Ps, Body}) -> 
+    {forall, Name, Ps, applyEnv(Env, Body)};
 applyEnv(_, T) -> T.
 % applyEnv(_, T) -> ?PRINT(T), T.
 
@@ -208,7 +213,7 @@ unify(Env, _Tvs, A, B) ->
     end.
 
 unifyList(Env, Tvs, As, Bs) ->
-    lists:foldr(fun({A, B}, {Ei, Ts}) ->
+    lists:foldl(fun({A, B}, {Ei, Ts}) ->
         {Ei_, T} = unify(Ei, Tvs, A, B),
         {Ei_, Ts ++ [T]}
     end,
@@ -392,12 +397,13 @@ do_btc_infer(Env, F) ->
     FunQName = util:getFnQName(F),
     % ?PRINT(FunQName),
     {SEnv, STy} = btc_synth(Env, [], F),
-    % ?PRINT(STy),
+    % ?PRINT(env:get_meta_map(SEnv)),
+    ?PRINT(STy),
     Ty_ = applyEnv(SEnv, STy),
-    % ?PRINT(Ty_),
+    ?PRINT(Ty_),
     % ?PRINT(env:get_meta_map(Env_)),
     {Env_, PTy} = prune(SEnv, Ty_),
-    % ?PRINT(PTy),
+    ?PRINT(PTy),
     % io:fwrite("~p :: ",[FunQName]),
     % showType(PTy),
     % io:fwrite("~n",[]),
@@ -430,10 +436,16 @@ btc_check(Env, Tvs, {nil, L}, Type) ->
     ListType = hm:tcon("List", [A], L),
     subsume(Env_1, Tvs, ListType, Type);
 btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
+    % ?PRINT(Head),
+    % ?PRINT(Tail),
+    % ?PRINT(Type),
     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
-    ElemTy = hm:getListType(Env_1, TType),
-    {Env_2, _HT} = btc_check(Env_1, Tvs, Head, ElemTy),
-    {Env_2, Type};
+    {Env_2, A} = hm:freshTMeta(Env_1, Tvs, L),
+    {Env_3, _HT} = btc_check(Env_2, Tvs, Head, A),
+    LType = hm:tcon("List", [A], L),
+    % {Env_4, LT} = subsume(Env_3, Tvs, LType, TType),
+    subsume(Env_3, Tvs, LType, Type);
+    % subsume(Env_4, Tvs, LT, Type);
 btc_check(Env, Tvs, {tuple, L, Es}, Type) ->
     % TODO verify how it works with proper type
     {Env_1, MetaTup} = hm:metaTupleTypeOfN(Env, length(Es), L),
@@ -460,7 +472,7 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
             % check_type_var(Env, Type, VarT),
             {Env_, VarT}
     end;
-btc_check(Env, Tvs, {call,L,F,Args}, Type) ->
+btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
     FT = synthFnCall(Env, F, length(Args)),
     Fresh_FT = hm:generalizeType(FT),
     {Env_1, OpenedType} = open_op_type(Env, Tvs, Fresh_FT),
@@ -561,10 +573,11 @@ btc_synth(Env, Tvs, {cons, L, Head, Tail}) ->
     {Env_1, HType} = btc_synth(Env, Tvs, Head),
     {Env_2, TType} = btc_synth(Env_1, Tvs, Tail),
     % generate a fresh "List"
-    {Env_3, A} = hm:freshTMeta(Env_2, Tvs, L),
-    LType = hm:tcon("List", [A], L),
-    {Env_4, _AU} = subsume(Env_3, Tvs, A, HType),
-    {Env_5, _LU} = subsume(Env_4, Tvs, LType, TType),
+    %% Not sure we need to create new fresh meta list %%
+    % {Env_3, A} = hm:freshTMeta(Env_2, Tvs, L),
+    LType = hm:tcon("List", [HType], L),
+    % {Env_4, _AU} = subsume(Env_3, Tvs, A, HType),
+    {Env_5, _LU} = subsume(Env_2, Tvs, LType, TType),
     {Env_5, LType};
 btc_synth(Env, Tvs, {tuple, L, Es}) ->
     {Env_, TTs} = lists:foldl(
@@ -574,6 +587,8 @@ btc_synth(Env, Tvs, {tuple, L, Es}) ->
         end, {Env,[]}, Es),
     TupleType = hm:tcon("Tuple", TTs, L),
     {Env_, TupleType};
+btc_synth(Env, Tvs, {var, L, '_'}) ->
+    hm:freshTMeta(Env, Tvs, true, L);
 btc_synth(Env, Tvs, {var, L, X}) ->
     case env:is_bound(X, Env) of
         true  ->
@@ -654,7 +669,9 @@ btc_synth(Env, Tvs, Node) ->
             end,
             % ClausesCheckRes = lists:map(fun(C) -> btc_synth(Env, Tvs, C) end, Clauses),
             {Env_2, CTs} = btc_synth_clauses(Env, Tvs, Clauses),
+            % ?PRINT(CTs),
             {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
+            % ?PRINT(CT),
             % {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
             {Env_3 , CT};
         X ->
@@ -816,7 +833,7 @@ btc_synth_clauses(Env, Tvs, Clauses) ->
 
 subsume_clauses(Env, Tvs, ClauseTys) ->
     C_First = hd(ClauseTys),
-    lists:foldr(
+    lists:foldl(
         fun(C, {Ei, CT}) ->
             {Ei_, CTS} = subsume(Ei, Tvs, CT, C),
             {Ei_, CTS}
