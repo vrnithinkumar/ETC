@@ -398,12 +398,12 @@ do_btc_infer(Env, F) ->
     % ?PRINT(FunQName),
     {SEnv, STy} = btc_synth(Env, [], F),
     % ?PRINT(env:get_meta_map(SEnv)),
-    ?PRINT(STy),
+    % ?PRINT(STy),
     Ty_ = applyEnv(SEnv, STy),
-    ?PRINT(Ty_),
+    % ?PRINT(Ty_),
     % ?PRINT(env:get_meta_map(Env_)),
     {Env_, PTy} = prune(SEnv, Ty_),
-    ?PRINT(PTy),
+    % ?PRINT(PTy),
     % io:fwrite("~p :: ",[FunQName]),
     % showType(PTy),
     % io:fwrite("~n",[]),
@@ -435,17 +435,22 @@ btc_check(Env, Tvs, {nil, L}, Type) ->
     {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
     ListType = hm:tcon("List", [A], L),
     subsume(Env_1, Tvs, ListType, Type);
+% btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
+%     % ?PRINT(Head),
+%     % ?PRINT(Tail),
+%     % ?PRINT(Type),
+%     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
+%     {Env_2, A} = hm:freshTMeta(Env_1, Tvs, L),
+%     {Env_3, _HT} = btc_check(Env_2, Tvs, Head, A),
+%     LType = hm:tcon("List", [A], L),
+%     % {Env_4, LT} = subsume(Env_3, Tvs, LType, TType),
+%     subsume(Env_3, Tvs, LType, Type);
+%     % subsume(Env_4, Tvs, LT, Type);
 btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
-    % ?PRINT(Head),
-    % ?PRINT(Tail),
-    % ?PRINT(Type),
     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
-    {Env_2, A} = hm:freshTMeta(Env_1, Tvs, L),
-    {Env_3, _HT} = btc_check(Env_2, Tvs, Head, A),
-    LType = hm:tcon("List", [A], L),
-    % {Env_4, LT} = subsume(Env_3, Tvs, LType, TType),
-    subsume(Env_3, Tvs, LType, Type);
-    % subsume(Env_4, Tvs, LT, Type);
+    ElemTy = hm:getListType(Env_1, TType),
+    {Env_2, _HT} = btc_check(Env_1, Tvs, Head, ElemTy),
+    {Env_2, Type};
 btc_check(Env, Tvs, {tuple, L, Es}, Type) ->
     % TODO verify how it works with proper type
     {Env_1, MetaTup} = hm:metaTupleTypeOfN(Env, length(Es), L),
