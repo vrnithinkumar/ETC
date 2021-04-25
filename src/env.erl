@@ -4,7 +4,8 @@
         ,freeInEnv/1,length/1
         ,dumpModuleBindings/2,readModuleBindings/1
         ,lookupRemote/3,extendRecord/4,lookupRecord/2
-        ,isPatternInf/1,setPatternInf/1,addGuard/3,checkGuard/2
+        ,isPatternInf/1,setPatternInf/1, resetPatternInf/1
+        , addGuard/3,checkGuard/2
         ,enableGuardExprEnv/1,disableGuardExprEnv/1
         ,isGuardExprEnabled/1 %,addModuleBindings/2
         ,addExtModuleBindings/2,lookup_ext_binding/2
@@ -182,6 +183,9 @@ isPatternInf(Env) ->
 
 setPatternInf(Env) ->
     Env#ten{isPattern = true}.
+
+resetPatternInf(Env) ->
+    Env#ten{isPattern = false}.
 
 %%%%%%%%% Existential Type Variable bindings.
 lookup_type_var(X, Env) -> proplists:get_value(X, Env#ten.type_var_bindings).
