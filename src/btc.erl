@@ -117,8 +117,9 @@ flattenApp({app, Left, Right}) ->
 flattenApp(T) -> {T, []}.
 
 % when Name == X
+substTVar({tvar, _, Name_X}, S, {tvar, _, Name}) when Name_X == Name -> S;
 substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
-substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
+% substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
 substTVar(X, S, {tMeta, _ , _Id, _Tvs, Type, _}) when Type /= null ->
     substTVar(X, S, Type);
 substTVar({tvar, _, {tMeta, _ , Id, _, null, M}}, S, {tMeta, _ , Id, _, null, M}) ->
@@ -138,9 +139,6 @@ substTVar(_X, _S, T) ->
     T.
 
 openTForall({forall, Name, _, Body}, T) ->
-    % ?PRINT(Name),
-    % ?PRINT(T),
-    % ?PRINT(Body),
     substTVar(Name, T, Body).
 
 % Subtyping
@@ -489,6 +487,7 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
     end;
 btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
     FT = synthFnCall(Env, F, length(Args)),
+    ?PRINT(FT),
     Fresh_FT = hm:generalizeType(FT),
     {Env_1, OpenedType} = open_op_type(Env, Tvs, Fresh_FT),
     ArgTypes = hm:get_fn_args(OpenedType),
@@ -799,17 +798,19 @@ open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
     Env_2 = case C of
         [{class, CName, _ }] ->
             CUT = type_class_to_union(CName),
-            udpate_tmeta_type(Env_1, M, CUT);
+            update_tmeta_type(Env_1, M, CUT);
         _ -> Env_1
     end,
+    % ?PRINT(Ty),
     Opened = openTForall(Ty, M),
-    % ?PRINT(M),
+    % ?PRINT(Opened),
     % ?PRINT(Opened),
     open_op_type(Env_2, Tvs, Opened);
 open_op_type(Env, _, OpType) ->
+    % ?PRINT(OpType),
     {Env, OpType}.
 
-udpate_tmeta_type(Env, {tMeta, L, Id_t, Tvs_t, _, Mono}, Type)->
+update_tmeta_type(Env, {tMeta, L, Id_t, Tvs_t, _, Mono}, Type)->
     NewMeta = {tMeta, L, Id_t, Tvs_t, Type, Mono},
     env:set_meta(Env, Id_t, NewMeta).
 
