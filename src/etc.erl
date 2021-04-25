@@ -772,7 +772,7 @@ getConstrTypes(Type, DataConstrs) ->
 
 % converts a type (node) in the AST to a hm:type()
 -spec node2type(erl_syntax:syntaxTree()) -> hm:type().
-node2type({var,L,'_'}) -> hm:fresh(L);
+node2type({var,L,'_'}) -> hm:bt(any, L);
 node2type({var,L,X}) -> hm:tvar(X, L);
 node2type({type,L,nil,[]}) ->
     %TODO not sure we have to handle different
@@ -798,10 +798,11 @@ node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
     CTypes = lists:map(fun node2Constraint/1, Constraints),
     CTMap = lists:foldl(fun({VarT, Type}, Map) ->
         %Update the type line number
-        NewVarT = hm:replaceLn(VarT,hm:getLn(VarT), hm:getLn(FunT)),
-        maps:put(NewVarT, Type, Map)
+        % NewVarT = hm:replaceLn(VarT,hm:getLn(VarT), hm:getLn(FunT)),
+        maps:put(tVarName(VarT), Type, Map)
     end, maps:new(), CTypes),
-    NT = applyConstraints(FunT, CTMap),
+    CTMap_ = applyCtrsToCtrs(CTMap),
+    NT = applyConstraints(FunT, CTMap_),
     NT;
 
 node2type({atom,_L,true}) -> 
@@ -828,18 +829,38 @@ node2Constraint({type,_L,constraint,[_CType,[Var, Type]]}) ->
     % ?PRINT(Type),
     {node2type(Var), node2type(Type)}.
 
+tVarName({tvar, _, VarName}) -> VarName;
+tVarName(T) -> T.
+
 applyConstraints({'funt',L,Args,RType}, CTMap) ->
-    SubstitutedArgs = lists:map(fun(Arg)-> 
-        case maps:is_key(Arg, CTMap) of
-            true -> maps:get(Arg,CTMap);
+    SubstitutedArgs = lists:map(fun(Arg)->
+        case maps:is_key(tVarName(Arg), CTMap) of
+            true -> maps:get(tVarName(Arg),CTMap);
             false -> Arg
         end
     end , Args),
-    SubstitutedRType = case maps:is_key(RType, CTMap) of
-        true -> maps:get(RType,CTMap);
+    SubstitutedRType = case maps:is_key(tVarName(RType), CTMap) of
+        true -> maps:get(tVarName(RType),CTMap);
         false -> RType
     end,
-    hm:funt(SubstitutedArgs, SubstitutedRType, L).
+    hm:funt(SubstitutedArgs, SubstitutedRType, L);
+applyConstraints({tcon, L, Name, Args}, CTMap) ->
+    Args_ = lists:map(fun(Arg)->
+        case maps:is_key(tVarName(Arg), CTMap) of
+            true -> maps:get(tVarName(Arg), CTMap);
+            false -> Arg
+        end
+    end , Args),
+    {tcon, L, Name, Args_};
+applyConstraints(T, _) -> T.
+
+% Hack for recursive type constraints application
+applyCtrsToCtrs(CTMap) ->
+    lists:foldl(fun({Var, Ty}, NMap) ->
+        NT = applyConstraints(Ty, CTMap),
+        maps:put(Var, NT, NMap)
+        end
+    , maps:new(), maps:to_list(CTMap)).
 
 % given a list branches, add all the common bindings (in all of them) to the env
 addCommonBindings(Clauses,Env,L) ->
