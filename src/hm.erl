@@ -589,6 +589,10 @@ is_same_predicates(P1s,P2s)->
             lists:map(fun({P1, P2}) -> P1==P2 end, lists:zip(P1s,P2s))).
 
 %% Sub type relation checker
+isSubType({bt, _, any}, _) -> true;
+isSubType(_, {bt, _, any}) -> true;
+isSubType({bt, _, term}, _) -> true;
+isSubType(_, {bt, _, term}) -> true;
 isSubType({tcon, _, "Union", Ts}, T) ->
     lists:any(fun(X) -> eqType(T, X) end, Ts);
 isSubType(T, {tcon, _, "Union", Ts}) ->
