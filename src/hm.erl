@@ -720,8 +720,10 @@ inplaceUDT (Env, {funt, L, Args, Ret}) ->
 inplaceUDT (Env, {tvar, L, _}=T) -> T;
 inplaceUDT (Env, {tcon, L, Name, Args} = T) ->
     case env:lookupUDT(Name, Env) of
-        [{A, B}] -> inplaceTCon(T, B);
-        []       -> T
+        [{A, B}] -> inplaceTCon(Env, T, B);
+        []       ->
+            Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
+            {tcon, L, Name, Args_}
     end;
 inplaceUDT (Env, {forall, TV, Ps, A}) ->
     {forall, TV, Ps, inplaceUDT(Env, A)};
@@ -732,7 +734,8 @@ inplaceUDT (Env, {tMeta, L, Id, Tvs, Type, M}) when Type /= null ->
 inplaceUDT (Env, {tMeta, _, _, _, _, _} = T) -> T;
 inplaceUDT (Env, {tSkol, _, _} = T) -> T.
 
-inplaceTCon({tcon, A_L, A_Name, A_Args}, {tcon, B_L, B_Name, B_Args})->
-    {tcon, A_L, B_Name, A_Args};
-inplaceTCon({tcon, A_L, A_Name, A_Args}, T)->
+inplaceTCon(Env, {tcon, A_L, A_Name, A_Args}, {tcon, B_L, B_Name, B_Args})->
+    Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, A_Args),
+    {tcon, A_L, B_Name, Args_};
+inplaceTCon(Env, {tcon, A_L, A_Name, A_Args}, T)->
         T.

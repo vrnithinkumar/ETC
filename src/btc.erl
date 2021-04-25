@@ -204,11 +204,11 @@ unify(Env, _Tvs, A, B) ->
         false ->
             ?PRINT(A),
             ?PRINT(B),
-            io:fwrite("unify failed with types ",[]),
+            io:fwrite("unify failed with types "),
             showType(A),
-            io:fwrite(" :=: ",[]),
+            io:fwrite(" :=: "),
             showType(B),
-            io:fwrite("~n",[]),
+            io:fwrite("~n"),
             terr("unify failed!")
     end.
 
@@ -231,8 +231,15 @@ unifyTMeta(Env, Tvs, {tMeta, _, Id, _, _, Mono}=M, T) ->
             TM = {tMeta, 0, Id, Tvs, T, Mono},
             Env__ = env:set_meta(Env_, Id, TM),
             {Env__, TM};
-        false -> 
-            terr("unifyTMeta failed: " ++ showType(M) ++ ":=" ++ showType(T))
+        false ->
+            ?PRINT(M),
+            ?PRINT(T),
+            io:fwrite("unify meta variable failed with types "),
+            showType(M),
+            io:fwrite(" :=: "),
+            showType(T),
+            io:fwrite("~n"),
+            terr("unify meta variable failed!")
 end.
 % unifyTMeta(Env, Tvs, M, T) ->
 %     ?PRINT(T),
@@ -383,8 +390,11 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
+    % ?PRINT(FunQName),
+    % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
+    % ?PRINT(GenSpecT),
     {Env_, Type} = btc_check(Env, [], F, GenSpecT),
     {Env_, Type}.
     % case Result of
@@ -518,18 +528,18 @@ btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
             subsume(Env2, Tvs, RetType, Type)
     end;
 btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
-    % ClausePatterns = clause_patterns(Clause),
+    ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
-    % {EnvPat, PatResults, _} = checkPatterns(Env, ClausePatterns, Type),
     % PatRes = lists:foldl(
     %     fun(ARes, Res) ->
     %         ARes and Res
     %     end, true, PatResults),
     % ClauseGuards = clause_guard(Node),
     {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
+    {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
     BodyType = hm:get_fn_rt(OpenedType),
-    {Env_, BodyRes} = checkClauseBody(Env_1, Tvs, ClauseBody, BodyType),
-    {Env_, Type};
+    {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
+    {Env_3, Type};
 btc_check(Env, Tvs, Node, Type) ->
     case type(Node) of
         Fun when Fun =:= function; Fun =:= fun_expr ->
@@ -686,16 +696,14 @@ btc_synth(Env, Tvs, Node) ->
     end.
 
 % % check if the arg patterns are matching.
-% -spec checkPatterns(hm:env(),[erl_syntax:syntaxTree()], hm:types()) -> 
-%     {hm:env(), [boolean()], [hm:types()]}.
-% checkPatterns(Env, ClausePatterns, Type) ->
-%     ArgTypes = hm:get_fn_args(Type),
-%     ArgAndTypes = lists:zip(ClausePatterns, ArgTypes),
-%     lists:foldl(
-%         fun({ArgPattern, ArgType},{Ei, AccRs, AccTs}) ->
-%             {Env_, Res, CType} = checkArgType(Ei, ArgPattern, ArgType),
-%             {Env_, AccRs ++ [Res], AccTs ++ [CType]}
-%         end, {Env, [],[]}, ArgAndTypes).
+checkPatterns(Env, Tvs, ClausePatterns, Type) ->
+    ArgTypes = hm:get_fn_args(Type),
+    ArgAndTypes = lists:zip(ClausePatterns, ArgTypes),
+    lists:foldl(
+        fun({ArgPattern, ArgType},{Ei, Args}) ->
+            {Ei_, Arg_} = btc_check(Ei, Tvs, ArgPattern, ArgType),
+            {Ei_, Args ++ [Arg_]}
+        end, {Env, []}, ArgAndTypes).
 
 % % check if the arg expr has given arg type.
 % -spec checkArgType(hm:env(), erl_syntax:syntaxTree(), hm:types()) -> 

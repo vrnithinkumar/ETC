@@ -772,16 +772,27 @@ getConstrTypes(Type, DataConstrs) ->
 
 % converts a type (node) in the AST to a hm:type()
 -spec node2type(erl_syntax:syntaxTree()) -> hm:type().
-node2type({var,L,X}) -> hm:tvar(X,L);
+node2type({var,L,'_'}) -> hm:fresh(L);
+node2type({var,L,X}) -> hm:tvar(X, L);
+node2type({type,L,nil,[]}) ->
+    %TODO not sure we have to handle different
+    hm:tcon("List",[hm:fresh(L)],L);
+node2type({type,L,non_neg_integer,[]}) ->
+    %TODO we have to remove
+    hm:bt(integer, L);
 node2type({type,L,T,[]}) -> hm:bt(T,L);
 node2type({type,L,tuple, any}) -> hm:tcon("Tuple",[],L);
 node2type({type,L,tuple,Args}) -> hm:tcon("Tuple",lists:map(fun node2type/1, Args),L);
-node2type({type,L,list,Args}) -> hm:tcon("List",lists:map(fun node2type/1, Args),L);
+node2type({type,L,list,Args}) ->
+    hm:tcon("List", lists:map(fun node2type/1, Args),L);
+node2type({type, L, nonempty_list, Args}) ->
+    % TODO not sure we have to handle different
+    hm:tcon("List", lists:map(fun node2type/1, Args), L);
 node2type({type,L,union,Args}) -> hm:tcon("Union",lists:map(fun node2type/1, Args),L);
 node2type({ann_type,_L,[_TVar, TNode]}) -> node2type(TNode);
 node2type({user_type,L,T,Args}) -> hm:tcon(T,lists:map(fun node2type/1, Args),L);
 node2type({type,L,'fun', [Args, RType]}) -> hm:funt(node2types(Args), node2type(RType), L);
-node2type({type,_L,'bounded_fun', [Func, Constraints]}) -> 
+node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
     FunT = node2type(Func),
     % TODO : clean up
     CTypes = lists:map(fun node2Constraint/1, Constraints),
@@ -792,8 +803,7 @@ node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
     end, maps:new(), CTypes),
     NT = applyConstraints(FunT, CTMap),
     NT;
-node2type({type, L, nonempty_list, Args}) ->
-    hm:tcon("List", lists:map(fun node2type/1, Args), L);
+
 node2type({atom,_L,true}) -> 
     hm:bt(boolean,0);
 node2type({atom,_L,false}) -> 
@@ -851,7 +861,7 @@ addRecUDT({Constr,Fields},Env,L) ->
         case F of
             {record_field,LF,_} -> 
                 [hm:fresh(LF)|AccArgs];
-            {record_field,LF,_,DefaultValue} -> 
+            {record_field,LF,_,DefaultValue} ->
                 [hm:fresh(LF)|AccArgs];
             {typed_record_field
                 , {record_field,_,_}
@@ -922,7 +932,6 @@ specToType(Env, {QFName, Types}) ->
     % We have to see how to handle multiple functions
     SpecT = hd(lists:map(fun node2type/1, Types)),
     InPlaced = hm:inplaceUDT(Env, SpecT),
-    % ?PRINT(InPlaced),
     {QFName, InPlaced}.
 
 checkWithSpec(Spec, X, T) ->
