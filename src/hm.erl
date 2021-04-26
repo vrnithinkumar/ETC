@@ -141,6 +141,7 @@ eqType({tcon,_,N1,As1},{tcon,_,N2,As2}) ->
     (N1 == N2) andalso util:eqLists(fun eqType/2,As1,As2);
 eqType({tMeta, _, Id, Tvs, Type_1, Mono}, {tMeta, _, Id, Tvs, Type_2, Mono}) ->
     eqType(Type_1, Type_2);
+eqType({tSkol, _, Id}, {tSkol, _, Id}) -> true;
 eqType(_,_) -> false.
 
 %%%%%%%%%%%% Utilities
