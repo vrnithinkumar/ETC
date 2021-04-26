@@ -226,9 +226,9 @@ unifyList(Env, Tvs, As, Bs) ->
     {Env, []}, lists:zip(As, Bs)).
 
 unifyTMeta(Env, _Tvs, M, M) -> {Env, M};
-unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type /= null ->
+unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type =/= null ->
     unify(Env, Tvs, Type, T);
-unifyTMeta(Env, Tvs, M, {tMeta, _, _, _, Type, _}) when Type /= null ->
+unifyTMeta(Env, Tvs, M, {tMeta, _, _, _, Type, _}) when Type =/= null ->
     unifyTMeta(Env, Tvs, M, Type);
 unifyTMeta(Env, _Tvs, {tMeta, L, Id, Tvs, null, Mono}, {bt, _, term}=T) ->
     TM = {tMeta, L, Id, Tvs, T, Mono},
@@ -285,6 +285,11 @@ unifyTMeta(Env, Tvs, {tMeta, _, Id_F, _, _, _}, {tMeta, _, Id_S, _, _, _}) ->
             io:fwrite("~n"),
             terr("unify meta variable failed!")
 end;
+% TODO: Not sure we can simply assign this but 
+unifyTMeta(Env, Tvs, {tMeta, L, Id, Tvs, null, Mono}, T) ->
+    TM = {tMeta, L, Id, Tvs, T, Mono},
+    Env_ = env:set_meta(Env, Id, TM),
+    {Env_, TM};
 unifyTMeta(_Env, _Tvs, M, T) ->
     % Nothing matches!
     ?PRINT(T),
@@ -443,8 +448,8 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    % ?PRINT(FunQName),
-    % ?PRINT(SpecFT),
+    ?PRINT(FunQName),
+    ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
     % ?PRINT(GenSpecT),
@@ -535,10 +540,8 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
             % synthAndSubsume(Env, Tvs, {var, L, X}, Type);
             % check_type_var(Env, Type, VarT);
         false ->
-            % ?PRINT(Type),
             VarT = hm:replaceLn(Type, L),
             Env_ = env:extend(X, VarT, Env),
-            % check_type_var(Env, Type, VarT),
             {Env_, VarT}
     end;
 btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
@@ -569,25 +572,14 @@ btc_check(Env, Tvs, {match, L, LNode, RNode} = Node, Type) ->
     end;
 btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
     OpType = lookup(Op, Env, L),
-    case hm:has_type_var(OpType) of
-        true  ->
-            % StrippedType = hm:type_without_bound(OpType),
-            % ?PRINT(OpType),
-            {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
-            Arg1Type = hd(hm:get_fn_args(OpenedType)),
-            Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
-            RetType = hm:get_fn_rt(OpenedType),
-            {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
-            {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
-            subsume(Env2, Tvs, RetType, Type);
-        false ->
-            Arg1Type = hd(hm:get_fn_args(OpType)),
-            Arg2Type = lists:last(hm:get_fn_args(OpType)),
-            RetType = hm:get_fn_rt(OpType),
-            {Env1, _T1} = btc_check(Env, Tvs, E1, Arg1Type),
-            {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
-            subsume(Env2, Tvs, RetType, Type)
-    end;
+    % StrippedType = hm:type_without_bound(OpType),
+    {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
+    Arg1Type = hd(hm:get_fn_args(OpenedType)),
+    Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
+    RetType = hm:get_fn_rt(OpenedType),
+    {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
+    {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
+    subsume(Env2, Tvs, RetType, Type);
 btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),

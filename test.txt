@@ -1,0 +1,457 @@
+DEBUG: btc:413 - "FunQName"
+
+ {union,2}
+
+DEBUG: btc:414 - "SpecFT"
+
+ {funt,91,
+       [{tcon,92,"List",[{tvar,92,'T1'}]},{tcon,93,"List",[{tvar,93,'T2'}]}],
+       {tcon,94,"List",[{tcon,94,"Union",[{tvar,94,'T1'},{tvar,94,'T2'}]}]}}
+
+DEBUG: btc:417 - "GenSpecT"
+
+ {forall,{tvar,91,'T1'},
+         [],
+         {forall,{tvar,91,'T2'},
+                 [],
+                 {funt,91,
+                       [{tcon,92,"List",[{tvar,92,'T1'}]},
+                        {tcon,93,"List",[{tvar,93,'T2'}]}],
+                       {tcon,94,"List",
+                             [{tcon,94,"Union",
+                                    [{tvar,94,'T1'},{tvar,94,'T2'}]}]}}}}
+
+DEBUG: btc:576 - "OpenedType"
+
+ {funt,0,
+       [{tcon,0,"List",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]},
+        {tcon,0,"List",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}],
+       {tcon,0,"List",
+             [{tcon,0,"Union",
+                    [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,
+                            true},
+                     {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,
+                            true}]}]}}
+
+DEBUG: btc:746 - "ArgPattern"
+
+ {match,98,{cons,98,{var,98,'E1'},{var,98,'_'}},{var,98,'Set1'}}
+
+DEBUG: btc:747 - "ArgType"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:541 - "Type"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:480 - "Tail"
+
+ {var,98,'_'}
+
+DEBUG: btc:482 - "TType"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:484 - "ElemTy"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:485 - "Head"
+
+ {var,98,'E1'}
+
+DEBUG: btc:276 - "Inf"
+
+ {tcon,98,"List",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:277 - "Ty"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:186 - "Name_A"
+
+ "List"
+
+DEBUG: btc:220 - "As"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]
+
+DEBUG: btc:221 - "Bs"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]
+
+DEBUG: btc:223 - "A"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:224 - "B"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:226 - "T"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:189 - "Args"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]
+
+DEBUG: btc:746 - "ArgPattern"
+
+ {cons,98,{var,98,'E2'},{var,98,'Es2'}}
+
+DEBUG: btc:747 - "ArgType"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}
+
+DEBUG: btc:480 - "Tail"
+
+ {var,98,'Es2'}
+
+DEBUG: btc:482 - "TType"
+
+ {tcon,98,"List",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}
+
+DEBUG: btc:484 - "ElemTy"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}
+
+DEBUG: btc:485 - "Head"
+
+ {var,98,'E2'}
+
+DEBUG: btc:578 - "PatResults"
+
+ [{tcon,0,"List",
+        [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]},
+  {tcon,0,"List",
+        [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}]
+
+DEBUG: btc:580 - "BodyType"
+
+ {tcon,0,"List",
+       [{tcon,0,"Union",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}]}
+
+DEBUG: btc:769 - "Last"
+
+ {cons,99,
+       {var,99,'E2'},
+       {call,99,{atom,99,union},[{var,99,'Es2'},{var,99,'Set1'}]}}
+
+DEBUG: btc:480 - "Tail"
+
+ {call,99,{atom,99,union},[{var,99,'Es2'},{var,99,'Set1'}]}
+
+DEBUG: btc:518 - "OpenedType"
+
+ {funt,0,
+       [{tcon,0,"List",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true}]},
+        {tcon,0,"List",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}],
+       {tcon,0,"List",
+             [{tcon,0,"Union",
+                    [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,
+                            true},
+                     {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,
+                            true}]}]}}
+
+DEBUG: btc:523 - "Arg"
+
+ {var,99,'Es2'}
+
+DEBUG: btc:524 - "ArgTy"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true}]}
+
+DEBUG: btc:276 - "Inf"
+
+ {tcon,98,"List",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}
+
+DEBUG: btc:277 - "Ty"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true}]}
+
+DEBUG: btc:186 - "Name_A"
+
+ "List"
+
+DEBUG: btc:220 - "As"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]
+
+DEBUG: btc:221 - "Bs"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true}]
+
+DEBUG: btc:223 - "A"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}
+
+DEBUG: btc:224 - "B"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true}
+
+DEBUG: btc:226 - "T"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],
+        {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true},
+        true}
+
+DEBUG: btc:189 - "Args"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],
+         {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true},
+         true}]
+
+DEBUG: btc:523 - "Arg"
+
+ {var,99,'Set1'}
+
+DEBUG: btc:524 - "ArgTy"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}
+
+DEBUG: btc:276 - "Inf"
+
+ {tcon,98,"List",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:277 - "Ty"
+
+ {tcon,0,"List",[{tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}
+
+DEBUG: btc:186 - "Name_A"
+
+ "List"
+
+DEBUG: btc:220 - "As"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]
+
+DEBUG: btc:221 - "Bs"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]
+
+DEBUG: btc:223 - "A"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:224 - "B"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}
+
+DEBUG: btc:226 - "T"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],
+        {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+        true}
+
+DEBUG: btc:189 - "Args"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],
+         {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+         true}]
+
+DEBUG: btc:530 - "Type"
+
+ {tcon,0,"List",
+       [{tcon,0,"Union",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}]}
+
+DEBUG: btc:531 - "RetType"
+
+ {tcon,0,"List",
+       [{tcon,0,"Union",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true},
+               {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}]}
+
+DEBUG: btc:276 - "Inf"
+
+ {tcon,0,"List",
+       [{tcon,0,"Union",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}]}
+
+DEBUG: btc:277 - "Ty"
+
+ {tcon,0,"List",
+       [{tcon,0,"Union",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true},
+               {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}]}
+
+DEBUG: btc:186 - "Name_A"
+
+ "List"
+
+DEBUG: btc:220 - "As"
+
+ [{tcon,0,"Union",
+        [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+         {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}]
+
+DEBUG: btc:221 - "Bs"
+
+ [{tcon,0,"Union",
+        [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true},
+         {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}]
+
+DEBUG: btc:223 - "A"
+
+ {tcon,0,"Union",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+        {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]}
+
+DEBUG: btc:224 - "B"
+
+ {tcon,0,"Union",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true},
+        {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]}
+
+DEBUG: btc:186 - "Name_A"
+
+ "Union"
+
+DEBUG: btc:220 - "As"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+  {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}]
+
+DEBUG: btc:221 - "Bs"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true},
+  {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}]
+
+DEBUG: btc:223 - "A"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:224 - "B"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170708>,[],null,true}
+
+DEBUG: btc:226 - "T"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+        {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+        true}
+
+DEBUG: btc:223 - "A"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}
+
+DEBUG: btc:224 - "B"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170709>,[],null,true}
+
+DEBUG: btc:226 - "T"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+DEBUG: btc:189 - "Args"
+
+ [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+         {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+         true},
+  {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]
+
+DEBUG: btc:226 - "T"
+
+ {tcon,0,"Union",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+               {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               true},
+        {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:189 - "Args"
+
+ [{tcon,0,"Union",
+        [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+                {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+                true},
+         {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}]
+
+DEBUG: btc:482 - "TType"
+
+ {tcon,0,"List",
+       [{tcon,0,"Union",
+              [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+                      {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,
+                             true},
+                      true},
+               {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}]}
+
+DEBUG: btc:484 - "ElemTy"
+
+ {tcon,0,"Union",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+               {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               true},
+        {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:485 - "Head"
+
+ {var,99,'E2'}
+
+DEBUG: btc:276 - "Inf"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],null,true}
+
+DEBUG: btc:277 - "Ty"
+
+ {tcon,0,"Union",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+               {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               true},
+        {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:256 - "T"
+
+ {tcon,0,"Union",
+       [{tMeta,0,#Ref<0.3269013147.1321205762.170680>,[],
+               {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true},
+               true},
+        {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}]}
+
+DEBUG: btc:257 - "M"
+
+ {tMeta,0,#Ref<0.3269013147.1321205762.170679>,[],null,true}
+
+../tests/btc/debug/ord_deb.erl: error in parse transform 'etc': {{badmatch,ok},
+                                 [{btc,btc_check,4,
+                                   [{file,
+                                     "/Users/vr/WorkSpace/Thesis/ETC/src/btc.erl"},
+                                    {line,486}]},
+                                  {btc,btc_check,4,
+                                   [{file,
+                                     "/Users/vr/WorkSpace/Thesis/ETC/src/btc.erl"},
+                                    {line,581}]},
+                                  {lists,map,2,
+                                   [{file,"lists.erl"},{line,1243}]},
+                                  {btc,btc_check,4,
+                                   [{file,
+                                     "/Users/vr/WorkSpace/Thesis/ETC/src/btc.erl"},
+                                    {line,591}]},
+                                  {btc,do_btc_check,3,
+                                   [{file,
+                                     "/Users/vr/WorkSpace/Thesis/ETC/src/btc.erl"},
+                                    {line,418}]},
+                                  {etc,'-btc_typeCheckSCC/2-fun-1-',2,
+                                   [{file,
+                                     "/Users/vr/WorkSpace/Thesis/ETC/src/etc.erl"},
+                                    {line,205}]},
+                                  {lists,foldl,3,
+                                   [{file,"lists.erl"},{line,1267}]},
+                                  {etc,btc_typeCheckSCC,2,
+                                   [{file,
+                                     "/Users/vr/WorkSpace/Thesis/ETC/src/etc.erl"},
+                                    {line,203}]}]}
