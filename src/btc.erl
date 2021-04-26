@@ -159,13 +159,13 @@ checkSolution(Env, {tMeta, _, Id_m, _, _, _} = M, {tMeta, _, Id_t, _, _, _}) ->
         null -> checkSolution(Env_, M, Type_t);
         _    -> {Env_, subset(Tvs_m, Tvs_t)}
     end;
-checkSolution(Env, M, {funt, _, [Left], Right}) ->
-    {Env_, LRes} = checkSolution(Env, M, Left),
-    {Env__, RRes} = checkSolution(Env_, M, Right),
+checkSolution(Env, M, {funt, _, Args, Ret}) ->
+    {Env_, LRes} = checkSolutionList(Env, M, Args),
+    {Env__, RRes} = checkSolution(Env_, M, Ret),
     {Env__, LRes and RRes};
-checkSolution(Env, M, {tcon, _, Left, [Right]}) ->
-    {Env_, LRes} = checkSolution(Env, M, Left),
-    {Env__, RRes} = checkSolution(Env_, M, Right),
+checkSolution(Env, M, {tcon, _, Name, Args}) ->
+    {Env_, LRes} = checkSolution(Env, M, Name),
+    {Env__, RRes} = checkSolutionList(Env_, M, Args),
     {Env__, LRes and RRes};
 checkSolution(Env, {tMeta, _, Id_m, _, _, _} = M, {forall, _, _, Body}) ->
     {tMeta, _, Id_m, _, _, Mono} = env:get_meta(Env, Id_m),
@@ -177,6 +177,12 @@ checkSolution(Env, {tMeta, _, Id_m, _, _, _}, {tSkol,_, Id}) ->
     {tMeta, _, Id_m, Tvs, _, _} = env:get_meta(Env, Id_m),
     {Env, lists:member(Id, Tvs)};
 checkSolution(Env, _M, _T) -> {Env, true}.
+
+checkSolutionList(Env, M, Args) ->
+    lists:foldr(fun(Arg, {Ei, Res}) ->
+        {Ei_, Res_} = checkSolution(Ei, M, Arg),
+        {Ei_, Res_ and Res}
+    end, {Env, true} ,Args).
 
 %% Clean up unify to use tvar functions
 unify(Env, _Tvs, A, A) -> {Env, A};
@@ -285,11 +291,24 @@ unifyTMeta(Env, Tvs, {tMeta, _, Id_F, _, _, _}, {tMeta, _, Id_S, _, _, _}) ->
             io:fwrite("~n"),
             terr("unify meta variable failed!")
 end;
-% TODO: Not sure we can simply assign this but 
-unifyTMeta(Env, Tvs, {tMeta, L, Id, Tvs, null, Mono}, T) ->
-    TM = {tMeta, L, Id, Tvs, T, Mono},
-    Env_ = env:set_meta(Env, Id, TM),
-    {Env_, TM};
+% TODO: Not sure we can simply assign this but , Fixed based on old solution
+unifyTMeta(Env, Tvs, {tMeta, L, Id, _, _, Mono} = M, T) ->
+    {Env_, Res} = checkSolution(Env, M, T),
+    case Res of
+        true  ->
+            TM = {tMeta, L, Id, Tvs, T, Mono},
+            Env__ = env:set_meta(Env_, Id, TM),
+            {Env__, TM};
+        false ->
+            ?PRINT(M),
+            ?PRINT(T),
+            io:fwrite("unify meta variable failed with types "),
+            showType(M),
+            io:fwrite(" :=: "),
+            showType(T),
+            io:fwrite("~n"),
+            terr("unify meta variable failed!")
+    end;
 unifyTMeta(_Env, _Tvs, M, T) ->
     % Nothing matches!
     ?PRINT(T),
@@ -454,7 +473,7 @@ do_btc_check(Env, F, SpecFT) ->
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
     % ?PRINT(GenSpecT),
     {Env_, Type} = btc_check(Env, [], F, GenSpecT),
-    {Env_, Type}.
+    {Env, Type}.
     % case Result of
     %     false -> erlang:error({type_error
     %                            , "Check failed for the function:: " ++ util:to_string(FunQName)});
@@ -589,6 +608,7 @@ btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     %     end, true, PatResults),
     % ClauseGuards = clause_guard(Node),
     {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
+    % ?PRINT(OpenedType),
     {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
     BodyType = hm:get_fn_rt(OpenedType),
     {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
