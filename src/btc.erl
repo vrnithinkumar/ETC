@@ -150,9 +150,9 @@ checkSolution(Env, T, T) -> {Env, false};
 checkSolution(Env, {tMeta, _, Id_m, _, _, _} = M, {tMeta, _, Id_t, _, _, _}) ->
 % todo     if (m.mono) t.mono = true;
     {tMeta, _, Id_m, Tvs_m, _, Mono_m} = env:get_meta(Env, Id_m),
-    {tMeta, _, Id_t, Tvs_t, Type_t, _} = env:get_meta(Env, Id_t),
+    {tMeta, L_t, Id_t, Tvs_t, Type_t, _} = env:get_meta(Env, Id_t),
     Env_ = case Mono_m of
-        true -> env:set_meta(Env, Id_t, {tMeta, 0, Id_t, Tvs_t, Type_t, true});
+        true -> env:set_meta(Env, Id_t, {tMeta, L_t, Id_t, Tvs_t, Type_t, true});
         false -> Env
     end,
     case Type_t of
@@ -230,6 +230,23 @@ unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type /= null ->
     unify(Env, Tvs, Type, T);
 unifyTMeta(Env, Tvs, M, {tMeta, _, _, _, Type, _}) when Type /= null ->
     unifyTMeta(Env, Tvs, M, Type);
+unifyTMeta(Env, _Tvs, {tMeta, L, Id, Tvs, null, Mono}, {bt, _, term}=T) ->
+    TM = {tMeta, L, Id, Tvs, T, Mono},
+    Env_ = env:set_meta(Env, Id, TM),
+    {Env_, TM};
+unifyTMeta(Env, _Tvs, {tMeta, L, Id, Tvs, null, Mono}, {bt, _, any}=T) ->
+    TM = {tMeta, L, Id, Tvs, T, Mono},
+    Env_ = env:set_meta(Env, Id, TM),
+    {Env_, TM};
+% Not sure we need this at all
+unifyTMeta(Env, _Tvs, {bt, _, term}=T, {tMeta, L, Id, Tvs, null, Mono}) ->
+    TM = {tMeta, L, Id, Tvs, T, Mono},
+    Env_ = env:set_meta(Env, Id, TM),
+    {Env_, TM};
+unifyTMeta(Env, _Tvs, {bt, _, any}=T, {tMeta, L, Id, Tvs, null, Mono}) ->
+    TM = {tMeta, L, Id, Tvs, T, Mono},
+    Env_ = env:set_meta(Env, Id, TM),
+    {Env_, TM};
 unifyTMeta(Env, _Tvs, {tMeta, _L, _Id, _, _, _Mono}=M, {tcon, _, "Union", _}=T) ->
     {Env_1, M_} = applyEnvAndPrune(Env, M),
     {Env_2, T_} = applyEnvAndPrune(Env_1, T),
@@ -527,6 +544,7 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
 btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
     FT = synthFnCall(Env, F, length(Args)),
     {Env_1, OpenedType} = genAndOpenFnCallTy(Env, Tvs, FT),
+    % ?PRINT(OpenedType),
     ArgTypes = hm:get_fn_args(OpenedType),
     % Env_ = env:disableGuardExprEnv(Env),
     {Env_2, ArgTys} = lists:foldl(
