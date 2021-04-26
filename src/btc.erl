@@ -92,23 +92,27 @@ prune_list(Env, Types) ->
     {Env, []}, Types),
     {E_, PL}.
 
-applyEnv(Env, {tMeta, _, Id, _, _, _}) ->
+applyEnv(Env, {tMeta, L, Id, _, _, _}) ->
     % ?PRINT(Id),
     {tMeta, L, Id, Tvs, Type, Mono} = env:get_meta(Env, Id),
     case Type of
         null -> {tMeta, L, Id, Tvs, Type, Mono};
         _    -> {tMeta, L, Id, Tvs, applyEnv(Env, Type), Mono}
     end;
-applyEnv(Env, {funt, _, Args, Ret}) ->
+applyEnv(Env, {funt, L, Args, Ret}) ->
     As_ = lists:map(fun(A) -> applyEnv(Env, A) end, Args),
-    hm:funt(As_, applyEnv(Env, Ret), 0);
-applyEnv(Env, {tcon, _, Name, Args}) -> 
+    hm:funt(As_, applyEnv(Env, Ret), L);
+applyEnv(Env, {tcon, L, Name, Args}) -> 
     As_ = lists:map(fun(A) -> applyEnv(Env, A) end, Args),
-    hm:tcon(applyEnv(Env, Name), As_, 0);
+    % We are not applying on the name of the tcon
+    hm:tcon(Name, As_, L);
 applyEnv(Env, {forall, Name, Ps, Body}) -> 
     {forall, Name, Ps, applyEnv(Env, Body)};
-applyEnv(_, T) -> T.
-% applyEnv(_, T) -> ?PRINT(T), T.
+% applyEnv(_, T) -> T.
+applyEnv(_, T) -> ?PRINT(T), T.
+
+applyEnvAndPrune(Env, Type) ->
+    prune(Env, applyEnv(Env, Type)).
 
 flattenApp({app, Left, Right}) ->
     {T, Args} = flattenApp (Left),
@@ -190,6 +194,10 @@ unify(Env, Tvs, {forall, Name_A, _, Body_A}=A, {forall, Name_A, _, Body_A}=B) ->
     Sk = hm:freshTSkol(),
     {tSkol, _, SkId} = Sk,
     unify(Env, [SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
+unify(Env, Tvs, {tMeta, _, Id_A, _, _, _}, {tMeta, _, Id_B, _, _, _}) ->
+    A = env:get_meta(Env, Id_A),
+    B = env:get_meta(Env, Id_B),
+    unifyTMeta(Env, Tvs, A, B);
 unify(Env, Tvs, {tMeta, _, Id_m, _, _, _}, B) ->
     A = env:get_meta(Env, Id_m),
     unifyTMeta(Env, Tvs, A, B);
@@ -222,11 +230,32 @@ unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type /= null ->
     unify(Env, Tvs, Type, T);
 unifyTMeta(Env, Tvs, M, {tMeta, _, _, _, Type, _}) when Type /= null ->
     unifyTMeta(Env, Tvs, M, Type);
-unifyTMeta(Env, Tvs, {tMeta, _, Id, _, _, Mono}=M, T) ->
+unifyTMeta(Env, _Tvs, {tMeta, _L, _Id, _, _, _Mono}=M, {tcon, _, "Union", _}=T) ->
+    {Env_1, M_} = applyEnvAndPrune(Env, M),
+    {Env_2, T_} = applyEnvAndPrune(Env_1, T),
+    case hm:isSubType(M_, T_) of
+        true->
+            % Todo if the unification with subtype we just ignore.
+            % TM = {tMeta, L, Id, Tvs, T, _Mono},
+            % Env__ = env:set_meta(Env, Id, TM),
+            {Env_2, M_};
+        false ->
+            ?PRINT(M_),
+            ?PRINT(T_),
+            io:fwrite("unify failed with meta of types "),
+            showType(M),
+            io:fwrite(" :=: "),
+            showType(T),
+            io:fwrite("~n"),
+            terr("unify failed!")
+    end;
+unifyTMeta(Env, Tvs, {tMeta, _, Id_F, _, _, _}, {tMeta, _, Id_S, _, _, _}) ->
+    {M, T} = orderTMeta(Env, Id_F, Id_S),
+    {tMeta, L, Id, _, _, Mono}=M,
     {Env_, Res} = checkSolution(Env, M, T),
     case Res of
         true  ->
-            TM = {tMeta, 0, Id, Tvs, T, Mono},
+            TM = {tMeta, L, Id, Tvs, T, Mono},
             Env__ = env:set_meta(Env_, Id, TM),
             {Env__, TM};
         false ->
@@ -238,10 +267,19 @@ unifyTMeta(Env, Tvs, {tMeta, _, Id, _, _, Mono}=M, T) ->
             showType(T),
             io:fwrite("~n"),
             terr("unify meta variable failed!")
-end.
-% unifyTMeta(Env, Tvs, M, T) ->
-%     ?PRINT(T),
-%     ?PRINT(M).
+end;
+unifyTMeta(_Env, _Tvs, M, T) ->
+    % Nothing matches!
+    ?PRINT(T),
+    ?PRINT(M).
+
+orderTMeta(Env, Id_F, Id_S) ->
+    case Id_F > Id_S of
+        true ->
+            {env:get_meta(Env, Id_F), env:get_meta(Env, Id_S)};
+        false ->
+            {env:get_meta(Env, Id_S), env:get_meta(Env, Id_F)}
+    end.
 
 subsume(Env, Tvs, Inf, {forall,_, _, _}=Ty) ->
     Sk = hm:freshTSkol(),
@@ -470,6 +508,7 @@ btc_check(Env, Tvs, {tuple, L, Es}, Type) ->
         end, {Env_1,[]}, lists:zip(Es, TTys)),
     subsume(Env_2, Tvs, MetaTup, Type);
 btc_check(Env, Tvs, {var, L, '_'}, Type) ->
+    % Nothing to check
     {Env, Type};
 btc_check(Env, Tvs, {var, L, X}, Type) ->
     case env:is_bound(X, Env) of
@@ -487,9 +526,7 @@ btc_check(Env, Tvs, {var, L, X}, Type) ->
     end;
 btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
     FT = synthFnCall(Env, F, length(Args)),
-    ?PRINT(FT),
-    Fresh_FT = hm:generalizeType(FT),
-    {Env_1, OpenedType} = open_op_type(Env, Tvs, Fresh_FT),
+    {Env_1, OpenedType} = genAndOpenFnCallTy(Env, Tvs, FT),
     ArgTypes = hm:get_fn_args(OpenedType),
     % Env_ = env:disableGuardExprEnv(Env),
     {Env_2, ArgTys} = lists:foldl(
@@ -502,9 +539,16 @@ btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
     subsume(Env_2, Tvs, Type, RetType);
     % subsume(Env_2, Tvs, RetType, Type); %TODO order we have to fix
 btc_check(Env, Tvs, {match, L, LNode, RNode} = Node, Type) ->
-    {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
-    {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
-    subsume(Env_2, Tvs, LTy, RTy);
+    case env:isPatternInf(Env) of 
+        false ->
+            {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
+            {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
+            subsume(Env_2, Tvs, LTy, RTy);
+        true ->
+            {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
+            {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
+            subsume(Env_2, Tvs, RTy, LTy)
+    end;
 btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
     OpType = lookup(Op, Env, L),
     case hm:has_type_var(OpType) of
@@ -696,13 +740,15 @@ btc_synth(Env, Tvs, Node) ->
 
 % % check if the arg patterns are matching.
 checkPatterns(Env, Tvs, ClausePatterns, Type) ->
+    PatCheckEnv = env:setPatternInf(Env),
     ArgTypes = hm:get_fn_args(Type),
     ArgAndTypes = lists:zip(ClausePatterns, ArgTypes),
-    lists:foldl(
+    {Env_1, ATypes} = lists:foldl(
         fun({ArgPattern, ArgType},{Ei, Args}) ->
             {Ei_, Arg_} = btc_check(Ei, Tvs, ArgPattern, ArgType),
             {Ei_, Args ++ [Arg_]}
-        end, {Env, []}, ArgAndTypes).
+        end, {PatCheckEnv, []}, ArgAndTypes),
+    {env:resetPatternInf(Env_1), ATypes}.
 
 % % check if the arg expr has given arg type.
 % -spec checkArgType(hm:env(), erl_syntax:syntaxTree(), hm:types()) -> 
@@ -714,13 +760,13 @@ checkPatterns(Env, Tvs, ClausePatterns, Type) ->
 % given a body of a clause, returns its type
 checkClauseBody(Env, Tvs, BodyExprs, Type) ->
     % TODO: We have to add support for let recursively here
-    % {Env_, CsBody, PsBody} = lists:foldl(
-    %     fun(Expr, {Ei,Csi,Psi}) -> 
-    %         {Ei_,Csi_,Psi_} = etc:checkExpr(Ei, Expr),
-    %         {Ei_, Csi ++ Csi_, Psi ++ Psi_}
-    %     end, {Env,[],[]}, lists:droplast(BodyExprs)),
-    % SolvedEnv = localConstraintSolver(Env_, CsBody, PsBody),
-    btc_check(Env, Tvs, lists:last(BodyExprs), Type).
+    Env_ = lists:foldr(fun(Expr, Ei) ->
+        {Ei_, _} = btc_synth(Ei, Tvs, Expr),
+        Ei_
+    end,
+    Env, lists:droplast(BodyExprs)),
+    Last = lists:last(BodyExprs),
+    btc_check(Env_, Tvs, Last, Type).
 
 % -spec localConstraintSolver(hm:env(), [hm:constraint()], [hm:predicate()]) ->
 %     hm:env().
@@ -736,6 +782,11 @@ synthFnCall(Env,{remote,L,{atom,_,Module},{atom,_,X}},ArgLen) ->
     lookupRemote({X,ArgLen},Env,L,Module);
 synthFnCall(Env,X,_) ->
     ?PRINT(X).
+
+genAndOpenFnCallTy(Env, Tvs, FnTy) ->
+    Fresh_FT = hm:generalizeType(FnTy),
+    Gen_FT = hm:generalizeSpecT(Env, Fresh_FT),
+    open_op_type(Env, Tvs, Gen_FT).
 
 %% Look up for function type and specialize
 -spec lookup(hm:tvar(),hm:env(),integer()) -> hm:type().
