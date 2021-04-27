@@ -262,8 +262,10 @@ free ({tcon, _, _, As})    ->
     , sets:new(), As);
 free ({forall, {tvar, _, X}, _, A}) 
                         -> sets:del_element(X, free(A));
-free ({whilst,_,T})         -> free(T).
-
+free ({whilst,_,T})         -> free(T);
+free({tMeta, _, _, _, Type, _}) when Type == null ->
+    sets:new();
+free({tSkol, _, _}) -> sets:new().
 
 -spec freeInPs([predicate()]) -> set:set(tvar()).
 freeInPs(Ps) ->
