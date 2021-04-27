@@ -463,11 +463,11 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    ?PRINT(FunQName),
-    ?PRINT(SpecFT),
+    % ?PRINT(FunQName),
+    % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
-    ?PRINT(GenSpecT),
+    % ?PRINT(GenSpecT),
     {Env_, Type} = btc_check(Env, [], F, GenSpecT),
     {Env, Type}.
     % case Result of
@@ -608,7 +608,6 @@ btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     %     end, true, PatResults),
     % ClauseGuards = clause_guard(Node),
     {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
-    ?PRINT(OpenedType),
     {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
     BodyType = hm:get_fn_rt(OpenedType),
     {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
