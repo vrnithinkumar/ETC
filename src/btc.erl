@@ -108,8 +108,8 @@ applyEnv(Env, {tcon, L, Name, Args}) ->
     hm:tcon(Name, As_, L);
 applyEnv(Env, {forall, Name, Ps, Body}) -> 
     {forall, Name, Ps, applyEnv(Env, Body)};
-% applyEnv(_, T) -> T.
-applyEnv(_, T) -> ?PRINT(T), T.
+applyEnv(_, T) -> T.
+% applyEnv(_, T) -> ?PRINT(T), T.
 
 applyEnvAndPrune(Env, Type) ->
     prune(Env, applyEnv(Env, Type)).
