@@ -186,6 +186,8 @@ checkSolutionList(Env, M, Args) ->
 
 %% Clean up unify to use tvar functions
 unify(Env, _Tvs, A, A) -> {Env, A};
+unify(Env, _Tvs, {bt, L, BT}, {bt, L, BT}) ->
+    {Env, {bt, L, BT}};
 unify(Env, _Tvs, {tvar, _, Name_A}, {tvar, _, Name_B}) when Name_A == Name_B ->
     {Env, hm:tvar(Name_A, 0)};
 unify(Env, Tvs, {funt, _, Args_A, Ret_A}, {funt, _, Args_B, Ret_B}) ->
@@ -253,25 +255,7 @@ unifyTMeta(Env, _Tvs, {bt, _, any}=T, {tMeta, L, Id, Tvs, null, Mono}) ->
     TM = {tMeta, L, Id, Tvs, T, Mono},
     Env_ = env:set_meta(Env, Id, TM),
     {Env_, TM};
-unifyTMeta(Env, _Tvs, {tMeta, _L, _Id, _, _, _Mono}=M, {tcon, _, "Union", _}=T) ->
-    {Env_1, M_} = applyEnvAndPrune(Env, M),
-    {Env_2, T_} = applyEnvAndPrune(Env_1, T),
-    case hm:isSubType(M_, T_) of
-        true->
-            % Todo if the unification with subtype we just ignore.
-            % TM = {tMeta, L, Id, Tvs, T, _Mono},
-            % Env__ = env:set_meta(Env, Id, TM),
-            {Env_2, M_};
-        false ->
-            ?PRINT(M_),
-            ?PRINT(T_),
-            io:fwrite("unify failed with meta of types "),
-            showType(M),
-            io:fwrite(" :=: "),
-            showType(T),
-            io:fwrite("~n"),
-            terr("unify failed!")
-    end;
+% This is to order tMeta based on dependency.
 unifyTMeta(Env, Tvs, {tMeta, _, Id_F, _, _, _}, {tMeta, _, Id_S, _, _, _}) ->
     {M, T} = orderTMeta(Env, Id_F, Id_S),
     {tMeta, L, Id, _, _, Mono}=M,
@@ -292,6 +276,9 @@ unifyTMeta(Env, Tvs, {tMeta, _, Id_F, _, _, _}, {tMeta, _, Id_S, _, _, _}) ->
             terr("unify meta variable failed!")
 end;
 % TODO: Not sure we can simply assign this but , Fixed based on old solution
+% A <: (A|B) how do we unify this meta relation?
+% A cannot say its same as A -> (A|B) which will do a cyclic dependency.
+% So going with 
 unifyTMeta(Env, Tvs, {tMeta, L, Id, _, _, Mono} = M, T) ->
     {Env_, Res} = checkSolution(Env, M, T),
     case Res of
@@ -299,20 +286,29 @@ unifyTMeta(Env, Tvs, {tMeta, L, Id, _, _, Mono} = M, T) ->
             TM = {tMeta, L, Id, Tvs, T, Mono},
             Env__ = env:set_meta(Env_, Id, TM),
             {Env__, TM};
+        false -> checkMetaSubtypes(Env_, M, T)
+    end;
+unifyTMeta(_Env, _Tvs, M, T) ->
+    % Nothing matches!
+    ?PRINT(T),
+    ?PRINT(M).
+
+checkMetaSubtypes(Env, M, T) ->
+    {Env_1, M_} = applyEnvAndPrune(Env, M),
+    {Env_2, T_} = applyEnvAndPrune(Env_1, T),
+    case hm:isSubType(M_, T_) of
+        true ->
+            % Todo if the unification with subtype we just ignore.
+            % Also do we need to check the other direction
+            {Env_2, M_};
         false ->
-            ?PRINT(M),
-            ?PRINT(T),
             io:fwrite("unify meta variable failed with types "),
             showType(M),
             io:fwrite(" :=: "),
             showType(T),
             io:fwrite("~n"),
             terr("unify meta variable failed!")
-    end;
-unifyTMeta(_Env, _Tvs, M, T) ->
-    % Nothing matches!
-    ?PRINT(T),
-    ?PRINT(M).
+    end.
 
 orderTMeta(Env, Id_F, Id_S) ->
     case Id_F > Id_S of
