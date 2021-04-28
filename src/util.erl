@@ -29,8 +29,11 @@ pairwiseChunk ([X|[Y|Tail]])    ->
     {[{X,Y} | TailChunks], Rem}.
 
 getFnName (Fun) -> element(3,Fun).
+
 getFnArgLen (Fun) -> element(4,Fun).
+
 getFnClauses (Fun) -> element(5,Fun).
+
 getLn(Node) -> element(2,Node).
 
 getFnQName(Fun) -> {getFnName(Fun), getFnArgLen(Fun)}.

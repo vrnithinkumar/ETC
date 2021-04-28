@@ -770,7 +770,6 @@ btc_synth(Env, Tvs, Node) ->
             {Env_2, CTs} = btc_synth_clauses(Env, Tvs, Clauses),
             % ?PRINT(CTs),
             {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
-            % ?PRINT(CT),
             % {Env_ , T} = btc_synth(Env, Tvs, hd(Clauses)),
             {Env_3 , CT};
         X ->
@@ -801,13 +800,14 @@ checkPatterns(Env, Tvs, ClausePatterns, Type) ->
 % given a body of a clause, returns its type
 checkClauseBody(Env, Tvs, BodyExprs, Type) ->
     % TODO: We have to add support for let recursively here
+    EnvUnionEn = env:enableClauseUnion(Env),
     Env_ = lists:foldr(fun(Expr, Ei) ->
         {Ei_, _} = btc_synth(Ei, Tvs, Expr),
         Ei_
-    end,
-    Env, lists:droplast(BodyExprs)),
+    end, EnvUnionEn, lists:droplast(BodyExprs)),
+    EnvUnionDis = env:disableClauseUnion(Env_),
     Last = lists:last(BodyExprs),
-    btc_check(Env_, Tvs, Last, Type).
+    btc_check(EnvUnionDis, Tvs, Last, Type).
 
 % -spec localConstraintSolver(hm:env(), [hm:constraint()], [hm:predicate()]) ->
 %     hm:env().
@@ -941,8 +941,10 @@ subsume_clauses(Env, Tvs, ClauseTys) ->
     C_First = hd(ClauseTys),
     lists:foldl(
         fun(C, {Ei, CT}) ->
-            {Ei_, CTS} = subsume(Ei, Tvs, CT, C),
-            {Ei_, CTS}
+            case env:canClauseUnion(Env) of
+                true  -> unifyClauseWithUnion(Ei, Tvs, CT, C);
+                false -> subsume(Ei, Tvs, CT, C)
+            end
         end,
         {Env, C_First}, tl(ClauseTys)).
 
@@ -977,3 +979,19 @@ checkGuardExpr(Env, Tvs, Exprs)->
         {Env_2, _} = subsume(Env_1, Tvs, InfT, hm:bt(boolean, 0)),
         Env_2
     end, Env, Exprs).
+
+unifyClauseWithUnion(Env, Tvs, {funt, L1, Args1, Ret1}, {funt, L2, Args2, Ret2}) ->
+    {Env_1, Args_} = lists:foldl(fun({Arg1, Arg2}, {Ei, As_}) ->
+        {Ei_, A_} = unifyWithUnion(Ei, Tvs, Arg1, Arg2),
+        {Ei_, As_ ++ [A_]}
+    end, {Env, []}, lists:zip(Args1, Args2)),
+    {Env_2, Ret_} = unifyWithUnion(Env_1, Tvs, Ret1, Ret2),
+    {Env_2, {funt, L1, Args_, Ret_}}.
+
+unifyWithUnion(Env, Tvs, T1, T2) ->
+    try subsume(Env, Tvs, T1, T2) of
+        Res -> Res
+    catch
+        _:_ ->
+            {Env, {tcon, util:getLn(T1), "Union", [T1, T2]}}
+    end.
