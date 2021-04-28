@@ -1,19 +1,20 @@
 -module(env).
--export([empty/0,lookup/2,extend/3,extendConstr/3,free/2
-        ,is_bound/2,fmapV/2,lookupConstrs/2,default/0
-        ,freeInEnv/1,length/1
-        ,dumpModuleBindings/2,readModuleBindings/1
-        ,lookupRemote/3,extendRecord/4,lookupRecord/2
-        ,isPatternInf/1,setPatternInf/1, resetPatternInf/1
-        , addGuard/3,checkGuard/2
-        ,enableGuardExprEnv/1,disableGuardExprEnv/1
-        ,isGuardExprEnabled/1 %,addModuleBindings/2
-        ,addExtModuleBindings/2,lookup_ext_binding/2
-        ,printExtBindings/1, dumpModuleSpecs/2
-        ,lookup_type_var/2, extend_type_var/3
-        ,set_meta/3, get_meta/2, get_meta_map/1
-        ,extendUDT/3, lookupUDT/2
-        ,readModuleSpecs/1, lookup_spec_binding/2, addSpecs/2, getSpecs/1]).
+-export([empty/0, lookup/2, extend/3, extendConstr/3, free/2
+        , is_bound/2, fmapV/2, lookupConstrs/2, default/0
+        , freeInEnv/1, length/1
+        , dumpModuleBindings/2, readModuleBindings/1
+        , lookupRemote/3, extendRecord/4,lookupRecord/2
+        , addGuard/3, checkGuard/2
+        , enableGuardExprEnv/1, disableGuardExprEnv/1
+        , isGuardExprEnabled/1 %,addModuleBindings/2
+        , addExtModuleBindings/2, lookup_ext_binding/2
+        , printExtBindings/1, dumpModuleSpecs/2
+        , lookup_type_var/2, extend_type_var/3
+        , set_meta/3, get_meta/2, get_meta_map/1
+        , extendUDT/3, lookupUDT/2
+        , isPatternInf/1, setPatternInf/1, resetPatternInf/1
+        , canClauseUnion/1, enableClauseUnion/1, disableClauseUnion/1
+        , readModuleSpecs/1, lookup_spec_binding/2, addSpecs/2, getSpecs/1]).
 
 -export_type([env/0]).
 
@@ -34,7 +35,8 @@
         guardExpr         = [],
         metaMap           = #{}, % hack to store meta var state
         isPattern         = false,
-        isGuardExpr       = false
+        isGuardExpr       = false,
+        clauseUnion       = false % For unify clauses with union in let case.
     }).
 
 -type env() :: ten.
@@ -201,3 +203,18 @@ set_meta(Env, Id, Type) ->
 
 get_meta_map(Env) ->
     Env#ten.metaMap.
+
+%%%%%%%%%clauseUnion%%%%%%%%%%
+%% To check if we wanted to have union type 
+%% on case structure in let infer.
+
+canClauseUnion(Env) -> 
+    Env#ten.clauseUnion.
+
+enableClauseUnion(Env) ->
+    Env#ten{clauseUnion = true}.
+
+disableClauseUnion(Env) ->
+    Env#ten{clauseUnion = false}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
