@@ -599,6 +599,17 @@ do_btc_infer(Env, F) ->
 %     {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
 %     {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
 %     subsume(Env2, Tvs, RetType, Type);
+btc_check(Env, Tvs, {'case',_,Expr,Clauses}, Type) ->
+    {Env_1, EType} = btc_synth(Env, Tvs, Expr),
+    {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
+    Env_3 = lists:foldr(fun(CT, Ei)->
+        Arg1Type = hd(hm:get_fn_args(CT)),
+        RetType = hm:get_fn_rt(CT),
+        {Ei_1, _} = subsume(Ei, Tvs, EType, Arg1Type),
+        {Ei_2, _} = subsume(Ei_1, Tvs, RetType, Type),
+        Ei_2
+     end, Env_2, CTs),
+    {Env_3, Type};
 btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
