@@ -26,13 +26,24 @@ union_case_ret(X) ->
 %         12 -> true
 %     end.
 
--spec union_case_ret_with_let(boolean()) ->  [] | boolean().
+-spec union_case_ret_with_let(boolean()) -> integer() | boolean().
 union_case_ret_with_let(X) ->
-    % Y = case X of
+    Y = case X of
+        true  -> false;
+        false -> 42
+    end, Y.
+    % case X of
     %     true  -> false;
-    %     false -> 42
-    % end,
-    case X of
+    %     false -> []
+    % end.
+
+-spec union_case_ret_with_let_list(boolean()) -> [] | boolean().
+union_case_ret_with_let_list(X) ->
+    Y = case X of
         true  -> false;
         false -> []
-    end.
+    end, Y.
+    % case X of
+    %     true  -> false;
+    %     false -> []
+    % end.

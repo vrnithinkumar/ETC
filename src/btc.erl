@@ -194,9 +194,9 @@ unify(Env, Tvs, {funt, _, Args_A, Ret_A}, {funt, _, Args_B, Ret_B}) ->
     {Env_, Args} = unifyList(Env, Tvs, Args_A, Args_B),
     {Env__, Ret_U} = unify(Env_, Tvs, Ret_A, Ret_B),
     {Env__, hm:funt(Args, Ret_U, 0)};
-unify(Env, Tvs, {tcon, _, Name_A, Args_A}, {tcon, _, Name_B, Args_B}) ->
-    {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B),
-    {Env_2, Args} = unifyList(Env_1, Tvs, Args_A, Args_B),
+unify(Env, Tvs, {tcon, _, Name, Args_A}, {tcon, _, Name, Args_B}) ->
+    % {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B),
+    {Env_2, Args} = unifyList(Env, Tvs, Args_A, Args_B),
     {Env_2, hm:tcon(Name, Args, 0)};
 unify(Env, Tvs, {forall, Name_A, _, Body_A}=A, {forall, Name_A, _, Body_A}=B) ->
     Sk = hm:freshTSkol(),
@@ -211,7 +211,11 @@ unify(Env, Tvs, {tMeta, _, Id_m, _, _, _}, B) ->
     unifyTMeta(Env, Tvs, A, B);
 unify(Env, Tvs, A , {tMeta, _, Id_m, _, _, _}) ->
     B = env:get_meta(Env, Id_m),
-    unifyTMeta(Env, Tvs, B, A);
+    % ?PRINT(A),
+    % ?PRINT(B),
+    % TODO: Do we need to swap now?
+    % unifyTMeta(Env, Tvs, B, A);
+    unifyTMeta(Env, Tvs, A, B);
 unify(Env, _Tvs, A, B) ->
     case hm:isSubType(A, B) of
         true-> {Env, A};
@@ -237,7 +241,7 @@ unifyTMeta(Env, _Tvs, M, M) -> {Env, M};
 unifyTMeta(Env, Tvs, {tMeta, _, _, _, Type, _}, T) when Type =/= null ->
     unify(Env, Tvs, Type, T);
 unifyTMeta(Env, Tvs, M, {tMeta, _, _, _, Type, _}) when Type =/= null ->
-    unifyTMeta(Env, Tvs, M, Type);
+    unify(Env, Tvs, M, Type);
 unifyTMeta(Env, _Tvs, {tMeta, L, Id, Tvs, null, Mono}, {bt, _, term}=T) ->
     TM = {tMeta, L, Id, Tvs, T, Mono},
     Env_ = env:set_meta(Env, Id, TM),
@@ -288,10 +292,19 @@ unifyTMeta(Env, Tvs, {tMeta, L, Id, _, _, Mono} = M, T) ->
             {Env__, TM};
         false -> checkMetaSubtypes(Env_, M, T)
     end;
+unifyTMeta(Env, Tvs, M, {tMeta, L, Id, _, _, Mono} = T) ->
+    {Env_, Res} = checkSolution(Env, M, T),
+    case Res of
+        true  ->
+            TT = {tMeta, L, Id, Tvs, M, Mono},
+            Env__ = env:set_meta(Env_, Id, TT),
+            {Env__, TT};
+        false -> checkMetaSubtypes(Env_, M, T)
+    end;
 unifyTMeta(_Env, _Tvs, M, T) ->
     % Nothing matches!
-    ?PRINT(T),
-    ?PRINT(M).
+    ?PRINT(M),
+    ?PRINT(T).
 
 checkMetaSubtypes(Env, M, T) ->
     {Env_1, M_} = applyEnvAndPrune(Env, M),
@@ -449,6 +462,9 @@ check(Env, Tvs, Term, Ty) ->
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
     {Env_, Inf} = btc_synth(Env, Tvs, Term),
+    % ?PRINT(Term),
+    % ?PRINT(Inf),
+    % ?PRINT(Ty),
     subsume(Env_, Tvs, Inf, Ty).
 
 type_check(Env, F) ->
@@ -605,7 +621,7 @@ btc_check(Env, Tvs, {'case',_,Expr,Clauses}, Type) ->
     Env_3 = lists:foldr(fun(CT, Ei)->
         Arg1Type = hd(hm:get_fn_args(CT)),
         RetType = hm:get_fn_rt(CT),
-        {Ei_1, _} = subsume(Ei, Tvs, EType, Arg1Type),
+        {Ei_1, _} = subsume(Ei, Tvs, Arg1Type, EType),
         {Ei_2, _} = subsume(Ei_1, Tvs, RetType, Type),
         Ei_2
      end, Env_2, CTs),
@@ -639,6 +655,7 @@ btc_check(Env, Tvs, Node, Type) ->
             {Env, Type};
         _ ->
             % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
+            % ?PRINT(Node),
             synthAndSubsume(Env, Tvs, Node, Type)
     end.
 

@@ -1,0 +1,29 @@
+DEBUG: btc:223 - "A"
+
+ {bt,33,integer}
+
+DEBUG: btc:224 - "B"
+
+ {bt,32,boolean}
+
+unify failed with types integer :=: boolean
+DEBUG: btc:223 - "A"
+
+ {tcon,44,"List",
+       [{tMeta,44,#Ref<0.314933853.2024538114.221753>,[],null,false}]}
+
+DEBUG: btc:224 - "B"
+
+ {bt,43,boolean}
+
+unify failed with types [?A] :=: boolean
+Module case_union: 
+  {union_case,1} :: ((integer|boolean))->boolean
+  {union_case_ret,1} :: (boolean)->(integer|boolean)
+  {union_case_ret_with_let,1} :: (boolean)->(integer|boolean)
+  {union_case_ret_with_let_list,1} :: (boolean)->([A]|boolean)
+
+btc_test_suit/test_cases/case_union.erl:4: Warning: function union_case/1 is unused
+btc_test_suit/test_cases/case_union.erl:11: Warning: function union_case_ret/1 is unused
+btc_test_suit/test_cases/case_union.erl:30: Warning: function union_case_ret_with_let/1 is unused
+btc_test_suit/test_cases/case_union.erl:41: Warning: function union_case_ret_with_let_list/1 is unused

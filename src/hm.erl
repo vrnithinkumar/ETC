@@ -138,8 +138,11 @@ eqType({tvar,_,X}, {tvar,_,Y}) -> X == Y;
 eqType({funt,_,As1, B1}, {funt,_,As2, B2}) ->
     eqType(B1,B2) andalso util:eqLists(fun eqType/2,As1,As2);
 eqType({tcon,_,N1,As1},{tcon,_,N2,As2}) ->
+    ?PRINT(As1),
+    ?PRINT(As2),
     (N1 == N2) andalso util:eqLists(fun eqType/2,As1,As2);
-eqType({tMeta, _, Id, Tvs, Type_1, Mono}, {tMeta, _, Id, Tvs, Type_2, Mono}) ->
+eqType({tMeta, _, _, Tvs, Type_1, Mono}, {tMeta, _, _, Tvs, Type_2, Mono}) ->
+    ?PRINT(Mono),
     eqType(Type_1, Type_2);
 eqType({tSkol, _, Id}, {tSkol, _, Id}) -> true;
 eqType(_,_) -> false.
@@ -595,16 +598,38 @@ is_same_predicates(P1s,P2s)->
             lists:map(fun({P1, P2}) -> P1==P2 end, lists:zip(P1s,P2s))).
 
 %% Sub type relation checker
-isSubType({bt, _, any}, _) -> true;
+% isSubType({bt, _, any}, _) -> true;
+% isSubType({bt, _, term}, _) -> true;
 isSubType(_, {bt, _, any}) -> true;
-isSubType({bt, _, term}, _) -> true;
 isSubType(_, {bt, _, term}) -> true;
-isSubType({tcon, _, "Union", Ts}, T) ->
-    lists:any(fun(X) -> eqType(T, X) end, Ts);
+isSubType({bt, _, T1}, {bt, _, T2}) -> T1 == T2;
+isSubType({tvar, _, A1}, {tvar, _, A2}) -> A1 == A2;
+isSubType(T1,{whilst,[],T2}) -> isSubType(T1, T2);
+isSubType({whilst,[],T1}, T2) -> isSubType(T1, T2);
+isSubType({whilst,P1s,A1},{whilst,P2s,A2}) ->
+    is_same_predicates(P1s, P2s) and is_same(A1, A2);
+isSubType({forall, _, P1s, A1},{forall, _, P2s, A2}) ->
+    is_same_predicates(P1s, P2s) and is_same(A1, A2);
+isSubType({tMeta, _, _, _, Type, _}, T) when Type =/= null ->
+    isSubType(Type, T);
+isSubType(M, {tMeta, _, _, _, Type, _}) when Type =/= null ->
+    isSubType(M, Type);
+isSubType({tMeta, _, _, Tvs, null, Mono1}, {tMeta, _, _, Tvs, null, Mono2}) ->
+    % Mono1 == Mono2 and isSubType(Type1, Type2);
+    true;
+isSubType({tMeta, _, Id, Tvs, Type1, Mono1}, {tMeta, _, Id, Tvs, Type2, Mono2}) ->
+    Mono1 == Mono2 and isSubType(Type1, Type2);
+isSubType({tSkol, _, Id}, {tSkol, _, Id}) -> true;
+% isSubType({tcon, _, "Union", Ts}, T) ->
+%     lists:any(fun(X) -> isSubType(T, X) end, Ts);
 isSubType(T, {tcon, _, "Union", Ts}) ->
-    lists:any(fun(X) -> eqType(T, X) end, Ts);
+    lists:any(fun(X) ->  isSubType(T, X) end, Ts);
+isSubType({tcon, _, N, A1s}, {tcon, _, N, A2s}) -> is_sub_types(A1s, A2s);
 isSubType(T1, T2) -> eqType(T1, T2).
 
+is_sub_types(T1s, T2s)->
+    not lists:member(false,
+            lists:map(fun({T1, T2}) -> isSubType(T1, T2) end, lists:zip(T1s,T2s))).
 % most_general_type()
 
 %% Type Check Helpers
