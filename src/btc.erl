@@ -120,31 +120,6 @@ flattenApp({app, Left, Right}) ->
     % {T, [Right] ++ Args};
 flattenApp(T) -> {T, []}.
 
-% when Name == X
-substTVar({tvar, _, Name_X}, S, {tvar, _, Name}) when Name_X == Name -> S;
-substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
-% substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
-substTVar(X, S, {tMeta, _ , _Id, _Tvs, Type, _}) when Type /= null ->
-    substTVar(X, S, Type);
-substTVar({tvar, _, {tMeta, _ , Id, _, null, M}}, S, {tMeta, _ , Id, _, null, M}) ->
-    S;
-substTVar(X, S, {funt, _, Args, RetTy}) ->
-    SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
-    hm:funt(SubArgs, substTVar(X, S, RetTy), 0);
-substTVar(X, S, {tcon, _, Name, Args}) ->
-    SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
-    hm:tcon(substTVar(X, S, Name), SubArgs, 0);
-substTVar(X, S, {forall, Name, Ps, Body}) when Name /= X ->
-    {forall, Name, Ps, substTVar(X, S, Body)};
-substTVar(_X, _S, T) ->
-    % ?PRINT(_X),
-    % ?PRINT(_S),
-    % ?PRINT(T),
-    T.
-
-openTForall({forall, Name, _, Body}, T) ->
-    substTVar(Name, T, Body).
-
 % Subtyping
 checkSolution(Env, T, T) -> {Env, false};
 checkSolution(Env, {tMeta, _, Id_m, _, _, _} = M, {tMeta, _, Id_t, _, _, _}) ->
@@ -201,7 +176,7 @@ unify(Env, Tvs, {tcon, _, Name, Args_A}, {tcon, _, Name, Args_B}) ->
 unify(Env, Tvs, {forall, Name_A, _, Body_A}=A, {forall, Name_A, _, Body_A}=B) ->
     Sk = hm:freshTSkol(),
     {tSkol, _, SkId} = Sk,
-    unify(Env, [SkId] ++ Tvs, openTForall(A, Sk), openTForall(B, Sk));
+    unify(Env, [SkId] ++ Tvs, hm:openTForall(A, Sk), hm:openTForall(B, Sk));
 unify(Env, Tvs, {tMeta, _, Id_A, _, _, _}, {tMeta, _, Id_B, _, _, _}) ->
     A = env:get_meta(Env, Id_A),
     B = env:get_meta(Env, Id_B),
@@ -217,11 +192,13 @@ unify(Env, Tvs, A , {tMeta, _, Id_m, _, _, _}) ->
     % unifyTMeta(Env, Tvs, B, A);
     unifyTMeta(Env, Tvs, A, B);
 unify(Env, _Tvs, A, B) ->
-    case hm:isSubType(A, B) of
-        true-> {Env, A};
+    {Env_1, A_} = applyEnvAndPrune(Env, A),
+    {Env_2, B_} = applyEnvAndPrune(Env_1, B),
+    case hm:isSubType(A_, B_) of
+        true-> {Env_2, A};
         false ->
-            ?PRINT(A),
-            ?PRINT(B),
+            ?PRINT(A_),
+            ?PRINT(B_),
             io:fwrite("unify failed with types "),
             showType(A),
             io:fwrite(" :=: "),
@@ -334,10 +311,10 @@ orderTMeta(Env, Id_F, Id_S) ->
 subsume(Env, Tvs, Inf, {forall,_, _, _}=Ty) ->
     Sk = hm:freshTSkol(),
     {tSkol, _, SkId} = Sk,
-    unify(Env, [SkId] ++ Tvs, Inf, openTForall(Ty, Sk));
+    unify(Env, [SkId] ++ Tvs, Inf, hm:openTForall(Ty, Sk));
 subsume(Env, Tvs, {forall, _, _, _}=Inf, Ty) ->
     {Env_, M} = hm:freshTMeta(Env, Tvs, 0),
-    unify(Env_, Tvs, openTForall(Inf, M), Ty);
+    unify(Env_, Tvs, hm:openTForall(Inf, M), Ty);
 subsume(Env, Tvs, Inf, Ty) ->
     % ?PRINT(Inf),
     % ?PRINT(Ty),
@@ -380,7 +357,7 @@ synth(_, _, Term) ->
 
 synthapps(Env, Tvs, {forall, _, _, _} = Ty, As, ExpectedType, Acc) ->
     {Env_, M}= hm:freshTMeta(Env, Tvs, 0),
-    synthapps(Env_, Tvs, openTForall(Ty, M), As, ExpectedType, Acc);
+    synthapps(Env_, Tvs, hm:openTForall(Ty, M), As, ExpectedType, Acc);
 synthapps(Env, Tvs, {funt, _, [Left], Right}, As, ExpectedType, Acc) when length(As) > 0 ->
     [TM | AsTail] = As,
     Acc_ = Acc ++ [{TM, Left}],
@@ -443,7 +420,7 @@ check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
 check(Env, Tvs, Term, {forall, _, _, _} = Ty) ->
     Sk = hm:freshTSkol(0),
     {tSkol, _, SkId} = Sk,
-    check(Env, [SkId] ++ Tvs, Term, openTForall(Ty, Sk));
+    check(Env, [SkId] ++ Tvs, Term, hm:openTForall(Ty, Sk));
 check(Env, Tvs, {abs, Name, Body}, {funt, _, [Left], Right}) ->
     check(env:extend(Name, Left, Env), Tvs, Body, Right);
 check(Env, Tvs, {app, _, _} = Term, Ty) ->
@@ -480,8 +457,9 @@ type_check(Env, F) ->
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
     % ?PRINT(FunQName),
-    % ?PRINT(SpecFT),
+    ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
+    ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
     % ?PRINT(GenSpecT),
     {Env_, Type} = btc_check(Env, [], F, GenSpecT),
@@ -911,7 +889,7 @@ open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
         _ -> Env_1
     end,
     % ?PRINT(Ty),
-    Opened = openTForall(Ty, M),
+    Opened = hm:openTForall(Ty, M),
     % ?PRINT(Opened),
     % ?PRINT(Opened),
     open_op_type(Env_2, Tvs, Opened);

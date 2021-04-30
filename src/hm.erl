@@ -13,6 +13,7 @@
 -export([has_type_var/1, is_type_var/1, type_without_bound/1]).
 -export([get_fn_args/1, get_fn_rt/1, generalizeSpecT/2]).
 -export([getListType/2, getTupleType/2, metaTupleTypeOfN/3]).
+-export([substTVar/3, openTForall/2]).
 -export([inplaceUDT/2]).
 -export_type([constraint/0,type/0]).
 
@@ -747,19 +748,68 @@ generalizeSpecT (Env, Type) ->
 bindTV ([],T)      -> T;
 bindTV ([X|Xs],T)  -> {forall, {tvar,getLn(T), X}, [], bindTV(Xs,T)}.
 
+%%%%%%%%%%%%%%%%%%%%%FROM BTC specific %%%%%%%
+% when Name == X
+substTVar({tvar, _, Name_X}, S, {tvar, _, Name}) when Name_X == Name -> S;
+substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
+% substTVar(X, S, {tvar, _, _Name} = TVar) when TVar == X -> S;
+substTVar(X, S, {tMeta, _ , _Id, _Tvs, Type, _}) when Type /= null ->
+    substTVar(X, S, Type);
+substTVar({tvar, _, {tMeta, _ , Id, _, null, M}}, S, {tMeta, _ , Id, _, null, M}) ->
+    S;
+substTVar(X, S, {funt, _, Args, RetTy}) ->
+    SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
+    hm:funt(SubArgs, substTVar(X, S, RetTy), 0);
+substTVar(X, S, {tcon, _, Name, Args}) ->
+    SubArgs = lists:map(fun (A) -> substTVar(X, S, A) end, Args),
+    hm:tcon(substTVar(X, S, Name), SubArgs, 0);
+substTVar(X, S, {forall, Name, Ps, Body}) when Name /= X ->
+    {forall, Name, Ps, substTVar(X, S, Body)};
+substTVar(_X, _S, T) ->
+    % ?PRINT(_X),
+    % ?PRINT(_S),
+    % ?PRINT(T),
+    T.
+
+openTForall({forall, Name, _, Body}, T) ->
+    substTVar(Name, T, Body).
+%%%%%%%%%%%%%%%%%%%%%
+
 inplaceUDT (Env, {bt, _, _} =T ) -> T;
 inplaceUDT (Env, {funt, L, Args, Ret}) ->
-    Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
+    ?PRINT(Args),
+    Args_ = lists:map(fun (A)->
+        ?PRINT(A),
+        A_ =inplaceUDT(Env, A),
+        ?PRINT(A_),
+        A_
+    end, Args),
+    ?PRINT(Args_),
     Ret_ = inplaceUDT(Env, Ret),
     {funt, L, Args_, Ret_};
 inplaceUDT (Env, {tvar, L, _}=T) -> T;
-inplaceUDT (Env, {tcon, L, Name, Args} = T) ->
-    case env:lookupUDT(Name, Env) of
-        [{A, B}] -> inplaceTCon(Env, T, B);
+inplaceUDT (Env, {tcon, L, Name, Args} = T) when is_atom(Name) ->
+    TypeId = {Name, length(Args)},
+    case env:lookupUDT(TypeId, Env) of
+        [{A, B}] ->
+            AD = argsDict(T, A),
+            % ?PRINT(AD),
+            % % inplaceTCon(Env, T, B)
+            replaceArgs(Env, B, AD);
+            % RP = replaceArgs(Env, B, AD),
+            % ?PRINT(T),
+            % ?PRINT(A),
+            % ?PRINT(B),
+            % ?PRINT(RP);
         []       ->
-            Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
-            {tcon, L, Name, Args_}
+            erlang:error({type_error, "Unable to find a type alias for" ++ atom_to_list(Name)})
+            % Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
+            % {tcon, L, Name, Args_}
     end;
+%% tcon like "List", Tuple, "Union"
+inplaceUDT (Env, {tcon, L, Name, Args}) ->
+    Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
+    {tcon, L, Name, Args_};
 inplaceUDT (Env, {forall, TV, Ps, A}) ->
     {forall, TV, Ps, inplaceUDT(Env, A)};
 inplaceUDT (Env, {whilst, L, T}) ->
@@ -774,3 +824,11 @@ inplaceTCon(Env, {tcon, A_L, A_Name, A_Args}, {tcon, B_L, B_Name, B_Args})->
     {tcon, A_L, B_Name, Args_};
 inplaceTCon(Env, {tcon, A_L, A_Name, A_Args}, T)->
         T.
+
+argsDict({tcon, _, _, Args}, {tcon, _, _, Args_Orig})->
+    lists:zip(Args, Args_Orig).
+
+replaceArgs(Env, Orig, ArgsDic) ->
+    lists:foldr(fun({S, X}, OT)->
+        substTVar(X, S, OT)
+    end, Orig, ArgsDic).

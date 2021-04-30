@@ -952,7 +952,9 @@ specToType(Env, {QFName, Types}) ->
     % {QFName, lists:map(fun node2type/1, Types)}.
     % We have to see how to handle multiple functions
     SpecT = hd(lists:map(fun node2type/1, Types)),
+    ?PRINT(SpecT),
     InPlaced = hm:inplaceUDT(Env, SpecT),
+    ?PRINT(InPlaced),
     {QFName, InPlaced}.
 
 checkWithSpec(Spec, X, T) ->
@@ -972,10 +974,13 @@ checkWithSpec(Spec, X, T) ->
 convertUDT(Env, Node) ->
     {TypeConstr,DataConstrs,Args} = element(4, Node),
     L = util:getLn(Node),
+    TypeId = {TypeConstr, length(Args)},
+    % ?PRINT(TypeConstr),
+    % ?PRINT(TypeId),
     % make type constructor
     Type = hm:tcon(TypeConstr,lists:map(fun node2type/1, Args),L),
     CtrType = node2type(DataConstrs),
     % GenType = hm:generalizeSpecT(Env, Type),
     % GenCtrType = hm:generalizeSpecT(Env, CtrType),
     % add every data constructor to Env
-    env:extendUDT(TypeConstr,{Type, CtrType}, Env).
+    env:extendUDT(TypeId,{Type, CtrType}, Env).
