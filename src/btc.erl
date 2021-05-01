@@ -457,9 +457,9 @@ type_check(Env, F) ->
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
     % ?PRINT(FunQName),
-    ?PRINT(SpecFT),
+    % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
-    ?PRINT(UdtInTy),
+    % ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
     % ?PRINT(GenSpecT),
     {Env_, Type} = btc_check(Env, [], F, GenSpecT),
@@ -702,6 +702,7 @@ btc_synth(Env, Tvs, {op, L, Op, E1, E2}) ->
     {Env2, RetType};
 btc_synth(Env, Tvs, {call,L,F,Args}) ->
     FT = synthFnCall(Env, F, length(Args)),
+    % ?PRINT(FT),
     {Env_, Fresh_FT} = genAndOpenFnCallTy(Env, Tvs, FT),
     % ?PRINT(Fresh_FT),
     {Env_1, OpenedType} = open_op_type(Env_, Tvs, Fresh_FT),

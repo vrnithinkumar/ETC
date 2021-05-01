@@ -67,8 +67,9 @@ parse_transform(Forms,_) ->
 
     % Get specs
     Specs = pp:getSpecs(Forms),
-    Spec = getSpecWithAllFuns(Env0, Specs),
-    EnvWithSpecs = env:addSpecs(Env0, Spec),
+    SpecEnv = getSpecWithAllFuns(Env0, Specs),
+    % ?PRINT(SpecEnv),
+    EnvWithSpecs = env:addSpecs(Env0, SpecEnv),
 
     % add all user defined records
     Env1 = lists:foldl(fun(Rec,AccEnv) ->
@@ -97,6 +98,7 @@ parse_transform(Forms,_) ->
                 % TODO- VR we have to see
                 % checkWithSpec(Spec, X, T),
                 io:fwrite("  ~p :: ",[X]), 
+                % ?PRINT(T),
                 hm:pretty(T), 
                 io:fwrite("~n",[])
             end, SortedBinds),
