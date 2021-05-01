@@ -795,12 +795,17 @@ inplaceUDT (Env, {tcon, L, Name, Args} = T) when is_atom(Name) ->
             AD = argsDict(T, A),
             % ?PRINT(AD),
             % % inplaceTCon(Env, T, B)
-            replaceArgs(Env, B, AD);
-            % RP = replaceArgs(Env, B, AD),
+            % replaceArgs(Env, B, AD);
+            RP = replaceArgs(Env, B, AD),
+            % ?PRINT(RP),
+            case canInplace(RP) of
+                true -> inplaceUDT(Env, RP);
+                false -> RP
+            end;
             % ?PRINT(T),
             % ?PRINT(A),
             % ?PRINT(B),
-            % ?PRINT(RP);
+            % ?PRINT(RP), RP;
         []       ->
             erlang:error({type_error, "Unable to find a type alias for '" ++ atom_to_list(Name) ++ "'"})
             % Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
@@ -832,3 +837,25 @@ replaceArgs(Env, Orig, ArgsDic) ->
     lists:foldr(fun({S, X}, OT)->
         substTVar(X, S, OT)
     end, Orig, ArgsDic).
+
+%% Should we replace again
+canInplace ({bt, _, _}) -> false;
+canInplace ({tvar, _, _}) -> false;
+canInplace ({funt, _, Args, Ret}) ->
+    ArgCIs = lists:foldr(fun(Arg, CanInp) ->
+        CanInp or canInplace(Arg)
+    end,
+    [] ,Args),
+    RetCI = canInplace(Ret),
+    ArgCIs or RetCI;
+canInplace ({tcon, _, Name, _}) when is_atom(Name) -> true;
+canInplace ({tcon, _, _, Args}) ->
+    lists:foldr(fun(Arg, CanInp) ->
+        CanInp or canInplace(Arg)
+    end,
+    false, Args);
+canInplace ({forall, {tvar, _, _}, _, A}) -> canInplace(A);
+canInplace ({whilst, _, T}) -> canInplace(T);
+canInplace ({tMeta, _, _, _, _, _} = TM) -> false;
+canInplace ({tSkol, _, _}) -> false;
+canInplace (NotSupported) -> ?PRINT(NotSupported), false.
