@@ -177,17 +177,6 @@ unify(Env, _Tvs, {tcon, _, "Tuple", []}, {tcon, _, "Tuple", _} = T) ->
     %% Handle the case where empty 'tuple()' type
     %% used for generic and dynamic n-sized tuples.
     {Env, T};
-unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
-    %% union subtype unify
-    case unionSubsume(Env, Tvs, A, B) of 
-        uni_failed -> unifyFailed(A, B);
-        Res -> Res
-    end;
-unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
-    case unionSubsume(Env, Tvs, A, B) of 
-        uni_failed -> unifyFailed(A, B);
-        Res -> Res
-    end;
 unify(Env, Tvs, {tcon, _, Name, Args_A}, {tcon, _, Name, Args_B}) ->
     % {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B), 
     % TODO: VR do we need this at all?
@@ -211,6 +200,21 @@ unify(Env, Tvs, A , {tMeta, _, Id_m, _, _, _}) ->
     % TODO: Do we need to swap now?
     % unifyTMeta(Env, Tvs, B, A);
     unifyTMeta(Env, Tvs, A, B);
+unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
+    %% union subtype unify
+    ?PRINT(A),
+    ?PRINT(B),
+    case unionSubsume(Env, Tvs, A, B) of 
+        uni_failed -> unifyFailed(A, B);
+        Res -> Res
+    end;
+unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
+    ?PRINT(A),
+    ?PRINT(B),
+    case unionSubsume(Env, Tvs, A, B) of 
+        uni_failed -> unifyFailed(A, B);
+        Res -> Res
+    end;
 unify(Env, _Tvs, A, B) ->
     {Env_1, A_} = applyEnvAndPrune(Env, A),
     {Env_2, B_} = applyEnvAndPrune(Env_1, B),
@@ -249,8 +253,8 @@ unionSubsume(Env, Tvs, {tcon, _, "Union", L_Types}=L, {tcon, _, "Union", _}=R) -
     {Env_, L};
 unionSubsume(Env, Tvs, A, {tcon, _, "Union", Types}) ->
     trySubsumeRightUnion(Env, Tvs, A, Types);
-unionSubsume(Env, Tvs, {tcon, _, "Union", Types}, A) ->
-    trySubsumeLeftUnion(Env, Tvs, A, Types).
+unionSubsume(Env, Tvs, {tcon, _, "Union", Types}, R) ->
+    trySubsumeLeftUnion(Env, Tvs, R, Types).
 
 trySubsumeRightUnion(_Env, _Tvs, _A, []) -> 
     uni_failed;
