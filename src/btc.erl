@@ -177,6 +177,17 @@ unify(Env, _Tvs, {tcon, _, "Tuple", []}, {tcon, _, "Tuple", _} = T) ->
     %% Handle the case where empty 'tuple()' type
     %% used for generic and dynamic n-sized tuples.
     {Env, T};
+unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
+    %% union subtype unify
+    case unionSubsume(Env, Tvs, A, B) of 
+        uni_failed -> unifyFailed(A, B);
+        Res -> Res
+    end;
+unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
+    case unionSubsume(Env, Tvs, A, B) of 
+        uni_failed -> unifyFailed(A, B);
+        Res -> Res
+    end;
 unify(Env, Tvs, {tcon, _, Name, Args_A}, {tcon, _, Name, Args_B}) ->
     % {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B), 
     % TODO: VR do we need this at all?
@@ -209,11 +220,65 @@ unify(Env, _Tvs, A, B) ->
             ?PRINT(A_),
             ?PRINT(B_),
             io:fwrite("unify failed with types "),
-            showType(A),
+            showType(A_),
             io:fwrite(" :=: "),
-            showType(B),
+            showType(B_),
             io:fwrite("~n"),
             terr("unify failed!")
+    end.
+
+unifyFailed(A, B) -> 
+    ?PRINT(A),
+    ?PRINT(B),
+    io:fwrite("union-unify failed with types "),
+    showType(A),
+    io:fwrite(" :=: "),
+    showType(B),
+    io:fwrite("~n"),
+    terr("unify failed!").
+
+% A <: (B|C) => (A <: B) or (A <: C)
+unionSubsume(Env, Tvs, {tcon, _, "Union", L_Types}=L, {tcon, _, "Union", _}=R) ->
+    Env_ = lists:foldr(fun(Ty, Ei) ->
+        Ei_ = case unionSubsume(Ei, Tvs, Ty, R) of
+            uni_failed -> unifyFailed(Ty, R);
+            {REi, A}   -> REi
+        end,
+        Ei_
+    end, Env, L_Types),
+    {Env_, L};
+unionSubsume(Env, Tvs, A, {tcon, _, "Union", Types}) ->
+    trySubsumeRightUnion(Env, Tvs, A, Types);
+unionSubsume(Env, Tvs, {tcon, _, "Union", Types}, A) ->
+    trySubsumeLeftUnion(Env, Tvs, A, Types).
+
+trySubsumeRightUnion(_Env, _Tvs, _A, []) -> 
+    uni_failed;
+trySubsumeRightUnion(Env, Tvs, A, [H | Tail]) ->
+    case tryUnify(Env, Tvs, A, H) of
+        uni_failed -> trySubsumeRightUnion(Env, Tvs, A, Tail);
+        Res -> Res
+    end.
+
+trySubsumeLeftUnion(Env, Tvs, A, Types) ->
+    Env_ = lists:foldr(fun(Ty, Ei) ->
+        {Ei_, A_} = unify(Ei, Tvs, Ty, A),
+        Ei_
+    end, Env, Types),
+    {Env_, A}.
+
+trySubsumeBothUnion(Env, Tvs, A, Types) ->
+    Env_ = lists:foldr(fun(Ty, Ei) ->
+        {Ei_, A_} = unify(Ei, Tvs, Ty, A),
+        Ei_
+    end, Env, Types),
+    {Env_, A}.
+
+tryUnify(Env, Tvs, T1, T2) ->
+    try subsume(Env, Tvs, T1, T2) of
+        Res -> Res
+    catch
+        _:_ -> uni_failed
     end.
 
 unifyList(Env, Tvs, As, Bs) ->
