@@ -208,6 +208,8 @@ unify(Env, _Tvs, A, B) ->
     end.
 
 unifyList(Env, Tvs, As, Bs) ->
+    % ?PRINT(As),
+    % ?PRINT(Bs),
     lists:foldl(fun({A, B}, {Ei, Ts}) ->
         {Ei_, T} = unify(Ei, Tvs, A, B),
         {Ei_, Ts ++ [T]}
@@ -456,7 +458,7 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    % ?PRINT(FunQName),
+    ?PRINT(FunQName),
     % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     % ?PRINT(UdtInTy),
@@ -701,20 +703,22 @@ btc_synth(Env, Tvs, {op, L, Op, E1, E2}) ->
     {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
     {Env2, RetType};
 btc_synth(Env, Tvs, {call,L,F,Args}) ->
-    FT = synthFnCall(Env, F, length(Args)),
+    {Env_0, FT }= synthFnCall(Env, F, length(Args)),
     % ?PRINT(FT),
-    {Env_, Fresh_FT} = genAndOpenFnCallTy(Env, Tvs, FT),
+    % {Env_0, FT_} = applyEnvAndPrune(Env, FT),
+    % ?PRINT(FT_),
+    {Env_1, Fresh_FT} = genAndOpenFnCallTy(Env_0, Tvs, FT),
     % ?PRINT(Fresh_FT),
-    {Env_1, OpenedType} = open_op_type(Env_, Tvs, Fresh_FT),
+    {Env_2, OpenedType} = open_op_type(Env_1, Tvs, Fresh_FT),
     ArgTypes = hm:get_fn_args(OpenedType),
-    {Env_2, ArgTys} = lists:foldl(
+    {Env_3, ArgTys} = lists:foldl(
         fun({Arg, ArgTy}, {Ei, ATs}) ->
             {Ei_, T} = btc_check(Ei, Tvs, Arg, ArgTy),
             {Ei_, ATs ++ [T]}
         end
-        , {Env_1,[]}, lists:zip(Args, ArgTypes)),
+        , {Env_2,[]}, lists:zip(Args, ArgTypes)),
     RetType = hm:get_fn_rt(OpenedType),
-    {Env_2, RetType};
+    {Env_3, RetType};
 btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
     {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
     {Env_2, RTy} = btc_synth(Env_1, Tvs, RNode),
@@ -814,11 +818,26 @@ checkClauseBody(Env, Tvs, BodyExprs, Type) ->
 %     hm:subE(Env, hm:comp(Sub_, Sub)).
 
 synthFnCall(Env,{atom,L,X},ArgLen) ->
-    lookup({X,ArgLen},Env,L);
+    {Env, lookup({X,ArgLen},Env,L)};
 synthFnCall(Env,{remote,L,{atom,_,Module},{atom,_,X}},ArgLen) ->
-    lookupRemote({X,ArgLen},Env,L,Module);
-synthFnCall(Env,X,_) ->
-    ?PRINT(X).
+    {Env, lookupRemote({X,ArgLen},Env,L,Module)};
+synthFnCall(Env, X, _) ->
+    case isFuncVar(X) of
+        true ->
+            {var, L, FName} = X,
+            FT = lookup(FName, Env, L),
+            applyEnvAndPrune(Env, FT); %TODO handle properly
+        false ->
+            ?PRINT(X),
+            erlang:error(type_error, "Function variable without known type")
+    end.
+
+isFuncVar({var, _, FName}) when is_atom(FName) ->
+    % ?PRINT(FName),
+    FC = hd(atom_to_list(FName)),
+    IsCap = ((FC >= $A) and (FC =< $Z)),
+    IsUS = (FC == $_),
+    IsUS or IsCap.
 
 genAndOpenFnCallTy(Env, Tvs, FnTy) ->
     Fresh_FT = hm:generalizeType(FnTy),
