@@ -779,8 +779,11 @@ node2type({var,L,X}) -> hm:tvar(X, L);
 node2type({type,L,nil,[]}) ->
     %TODO not sure we have to handle different
     hm:tcon("List",[hm:fresh(L)],L);
-node2type({type,L,non_neg_integer,[]}) ->
+node2type({type, L, non_neg_integer,[]}) ->
     %TODO we have to remove
+    hm:bt(integer, L);
+node2type({type, L, pos_integer, []}) ->
+    %TODO we have to remove once we support sub typing relation for integer +ve -ve integer
     hm:bt(integer, L);
 node2type({type,L,T,[]}) -> hm:bt(T,L);
 node2type({type,L,tuple, any}) -> hm:tcon("Tuple",[],L);
