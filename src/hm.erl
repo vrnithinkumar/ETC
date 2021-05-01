@@ -777,14 +777,14 @@ openTForall({forall, Name, _, Body}, T) ->
 
 inplaceUDT (Env, {bt, _, _} =T ) -> T;
 inplaceUDT (Env, {funt, L, Args, Ret}) ->
-    ?PRINT(Args),
+    % ?PRINT(Args),
     Args_ = lists:map(fun (A)->
-        ?PRINT(A),
+        % ?PRINT(A),
         A_ =inplaceUDT(Env, A),
-        ?PRINT(A_),
+        % ?PRINT(A_),
         A_
     end, Args),
-    ?PRINT(Args_),
+    % ?PRINT(Args_),
     Ret_ = inplaceUDT(Env, Ret),
     {funt, L, Args_, Ret_};
 inplaceUDT (Env, {tvar, L, _}=T) -> T;
@@ -802,7 +802,7 @@ inplaceUDT (Env, {tcon, L, Name, Args} = T) when is_atom(Name) ->
             % ?PRINT(B),
             % ?PRINT(RP);
         []       ->
-            erlang:error({type_error, "Unable to find a type alias for" ++ atom_to_list(Name)})
+            erlang:error({type_error, "Unable to find a type alias for '" ++ atom_to_list(Name) ++ "'"})
             % Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
             % {tcon, L, Name, Args_}
     end;

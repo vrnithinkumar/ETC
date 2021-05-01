@@ -952,9 +952,9 @@ specToType(Env, {QFName, Types}) ->
     % {QFName, lists:map(fun node2type/1, Types)}.
     % We have to see how to handle multiple functions
     SpecT = hd(lists:map(fun node2type/1, Types)),
-    ?PRINT(SpecT),
+    % ?PRINT(SpecT),
     InPlaced = hm:inplaceUDT(Env, SpecT),
-    ?PRINT(InPlaced),
+    % ?PRINT(InPlaced),
     {QFName, InPlaced}.
 
 checkWithSpec(Spec, X, T) ->

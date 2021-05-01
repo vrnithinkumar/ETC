@@ -12,7 +12,7 @@ eraseAnn(Forms) ->
     end, Forms).
 
 getUDTs(Forms) ->
-    getAttributes(Forms,'type').
+    getAttributes(Forms,'type') ++ getAttributes(Forms,'opaque').
 
 getRecs(Forms) ->
     getAttributes(Forms,'record').
@@ -20,7 +20,7 @@ getRecs(Forms) ->
 getSpecs(Forms) ->
         getAttributes(Forms,'spec').
 
-getAttributes(Forms,Attribute) ->
+getAttributes(Forms, Attribute) ->
     lists:filter(fun (Node) -> 
             (erl_syntax:type(Node) == 'attribute') andalso
             (element(3,Node) == Attribute)
