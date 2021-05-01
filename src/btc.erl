@@ -169,8 +169,17 @@ unify(Env, Tvs, {funt, _, Args_A, Ret_A}, {funt, _, Args_B, Ret_B}) ->
     {Env_, Args} = unifyList(Env, Tvs, Args_A, Args_B),
     {Env__, Ret_U} = unify(Env_, Tvs, Ret_A, Ret_B),
     {Env__, hm:funt(Args, Ret_U, 0)};
+unify(Env, _Tvs, {tcon, _, "Tuple", _} = T, {tcon, _, "Tuple", []}) ->
+    %% Handle the case where empty 'tuple()' type
+    %% used for generic and dynamic n-sized tuples.
+    {Env, T};
+unify(Env, _Tvs, {tcon, _, "Tuple", []}, {tcon, _, "Tuple", _} = T) ->
+    %% Handle the case where empty 'tuple()' type
+    %% used for generic and dynamic n-sized tuples.
+    {Env, T};
 unify(Env, Tvs, {tcon, _, Name, Args_A}, {tcon, _, Name, Args_B}) ->
-    % {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B),
+    % {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B), 
+    % TODO: VR do we need this at all?
     {Env_2, Args} = unifyList(Env, Tvs, Args_A, Args_B),
     {Env_2, hm:tcon(Name, Args, 0)};
 unify(Env, Tvs, {forall, Name_A, _, Body_A}=A, {forall, Name_A, _, Body_A}=B) ->
