@@ -537,11 +537,11 @@ type_check(Env, F) ->
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
     ?PRINT(FunQName),
-    % ?PRINT(SpecFT),
+    ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
-    % ?PRINT(UdtInTy),
+    ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
-    % ?PRINT(GenSpecT),
+    ?PRINT(GenSpecT),
     {Env_, Type} = btc_check(Env, [], F, GenSpecT),
     {Env, Type}.
     % case Result of
@@ -771,8 +771,16 @@ btc_synth(Env, Tvs, {var, L, X}) ->
             {Env_, A} = hm:freshTMeta(Env, Tvs, true, 0),
             {env:extend(X, A, Env_), A}
     end;
-btc_synth(Env, Tvs, {op, L, Op, E1, E2}) ->
-    OpType = lookup(Op, Env, L),
+    % {op,11,'not',{var,11,'X'}}
+btc_synth(Env, Tvs, {op, L, UOp, E}) ->
+    OpType = lookup(UOp, Env, L),
+    {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
+    Arg1Type = hd(hm:get_fn_args(OpenedType)),
+    RetType = hm:get_fn_rt(OpenedType),
+    {Env1, _T1} = btc_check(Env_, Tvs, E, Arg1Type),
+    {Env1, RetType};
+btc_synth(Env, Tvs, {op, L, BOp, E1, E2}) ->
+    OpType = lookup(BOp, Env, L),
     {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
     Arg1Type = hd(hm:get_fn_args(OpenedType)),
     Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
@@ -796,6 +804,7 @@ btc_synth(Env, Tvs, {call,L,F,Args}) ->
         end
         , {Env_2,[]}, lists:zip(Args, ArgTypes)),
     RetType = hm:get_fn_rt(OpenedType),
+    % printType(Env_3, RetType),
     {Env_3, RetType};
 btc_synth(Env, Tvs, {match, L, LNode, RNode} = Node) ->
     {Env_1, LTy} = btc_synth(Env, Tvs, LNode),
@@ -895,20 +904,28 @@ checkClauseBody(Env, Tvs, BodyExprs, Type) ->
 %     {Sub_, _RemPs}   = hm:solvePreds(rt:defaultClasses(), Ps),
 %     hm:subE(Env, hm:comp(Sub_, Sub)).
 
-synthFnCall(Env,{atom,L,X},ArgLen) ->
-    {Env, lookup({X,ArgLen},Env,L)};
+synthFnCall(Env,{atom, L, X}, ArgLen) ->
+    {Env, lookup({X, ArgLen}, Env, L)};
 synthFnCall(Env,{remote,L,{atom,_,Module},{atom,_,X}},ArgLen) ->
     {Env, lookupRemote({X,ArgLen},Env,L,Module)};
-synthFnCall(Env, X, _) ->
+synthFnCall(Env, X, ArgLen) ->
     case isFuncVar(X) of
         true ->
             {var, L, FName} = X,
             FT = lookup(FName, Env, L),
-            applyEnvAndPrune(Env, FT); %TODO handle properly
+            {Env_, HFT} = handleFreshFunc(Env, FT, X, ArgLen),
+            applyEnvAndPrune(Env_, HFT); %TODO handle properly
         false ->
             ?PRINT(X),
             erlang:error(type_error, "Function variable without known type")
     end.
+
+handleFreshFunc(Env, {tMeta,_,_,Tvs,null,_} = FT, {var, L, FName}, ArgLen) ->
+    {Env_1, SKT} = funcSkelton(Env, ArgLen, L),
+    FunQName = {FName, ArgLen},
+    {Env_2, FTU} = subsume(Env_1, Tvs, FT, SKT),
+    {env:replace_binding(FunQName, SKT, Env_2), SKT};
+handleFreshFunc(Env, FT, _, _) -> {Env, FT}.
 
 isFuncVar({var, _, FName}) when is_atom(FName) ->
     % ?PRINT(FName),
@@ -1052,6 +1069,9 @@ addFuncSkeltons(Env, Functions)->
 funcSkelton(Env, Func)->
     ArgLen = util:getFnArgLen(Func),
     L = util:getLn(Func),
+    funcSkelton(Env, ArgLen, L).
+
+funcSkelton(Env, ArgLen, L)->
     {Env_1, ATMs} = lists:foldr(fun(_, {Ei, ArgTs}) ->
         {Ei_, NM} = hm:freshTMeta(Ei, [], false, L),
         {Ei_, ArgTs ++ [NM]}
@@ -1088,3 +1108,9 @@ unifyWithUnion(Env, Tvs, T1, T2) ->
         _:_ ->
             {Env, {tcon, util:getLn(T1), "Union", [T1, T2]}}
     end.
+
+%%%%%%%%%%%%Test & Debug%%%%%%%%%%%%
+printType(Env, T) ->
+    {_, D_PT} = applyEnvAndPrune(Env, T),
+    ?PRINT(D_PT).
+%%%%%%%%%%%%Test & Debug%%%%%%%%%%%%
