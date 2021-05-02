@@ -844,19 +844,19 @@ applyConstraints({'funt',L,Args,RType}, CTMap) ->
     SubstitutedArgs = lists:map(fun(Arg)->
         case maps:is_key(tVarName(Arg), CTMap) of
             true -> maps:get(tVarName(Arg),CTMap);
-            false -> Arg
+            false -> applyConstraints(Arg, CTMap)
         end
     end , Args),
     SubstitutedRType = case maps:is_key(tVarName(RType), CTMap) of
         true -> maps:get(tVarName(RType),CTMap);
-        false -> RType
+        false -> applyConstraints(RType, CTMap)
     end,
     hm:funt(SubstitutedArgs, SubstitutedRType, L);
 applyConstraints({tcon, L, Name, Args}, CTMap) ->
     Args_ = lists:map(fun(Arg)->
         case maps:is_key(tVarName(Arg), CTMap) of
             true -> maps:get(tVarName(Arg), CTMap);
-            false -> Arg
+            false -> applyConstraints(Arg, CTMap)
         end
     end , Args),
     {tcon, L, Name, Args_};
