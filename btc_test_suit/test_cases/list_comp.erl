@@ -2,6 +2,10 @@
 -compile(export_all).
 % list computations
 
+head([H|T]) -> H.
+
+tail([H|T]) -> T.
+
 reverse(L) -> reverse(L,[]).
 
 reverse([],R) -> R;
