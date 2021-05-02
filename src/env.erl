@@ -1,5 +1,6 @@
 -module(env).
--export([empty/0, lookup/2, extend/3, extendConstr/3, free/2
+-export([empty/0, lookup/2, extend/3, replace_binding/3
+        ,extendConstr/3, free/2
         , is_bound/2, fmapV/2, lookupConstrs/2, default/0
         , freeInEnv/1, length/1
         , dumpModuleBindings/2, readModuleBindings/1
@@ -62,6 +63,8 @@ lookup_ext_binding(X,Env) -> proplists:get_value(X, Env#ten.ext_bindings).
 is_bound(X,Env) -> proplists:is_defined(X,Env#ten.bindings).
 
 extend(X,A,Env) -> Env#ten{bindings = [{X,A} | Env#ten.bindings]}.
+
+replace_binding(X, A, Env) -> Env#ten{bindings = lists:keyreplace(X, 1, Env#ten.bindings, {X, A})}.
 
 addGuard(X,A,Env) -> Env#ten{guardExpr = [{X,A} | Env#ten.guardExpr]}.
 
