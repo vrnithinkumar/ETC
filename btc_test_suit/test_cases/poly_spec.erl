@@ -32,4 +32,4 @@ id(X) -> X.
 % foo(X, Y) -> {Y, X}. %% Fails
 
 -spec list_foo([T1]) -> T1.
-list_foo([X|Xs]) -> id(Xs).
+list_foo([X|Xs]) -> id(X).

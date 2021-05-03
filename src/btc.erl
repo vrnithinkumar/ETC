@@ -413,7 +413,7 @@ synth(Env, Tvs, {ann, Term, Type}) ->
 synth(Env, Tvs, {app, _Left, _Right}=Term) ->
     {FT, As} = flattenApp(Term),
     {Env_, Ty} = synth(Env, Tvs, FT),
-    synthapps(Env_, Tvs, Ty, As, null, []);
+    synth_call(Env_, Tvs, Ty, As, null, []);
 synth(Env, Tvs, {abs, Name, Body}) ->
     {Env_1, A} = hm:freshTMeta(Env, Tvs, true, 0),
     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
@@ -435,18 +435,16 @@ synth(Env, Tvs, {if_else, Cond, TB, FB}) ->
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showAny(Term)).
 
-synthapps(Env, Tvs, {forall, _, _, _} = Ty, As, ExpectedType, Acc) ->
+synth_call(Env, Tvs, {forall, _, _, _} = Ty, As, ExpectedType, Acc) ->
     {Env_, M}= hm:freshTMeta(Env, Tvs, 0),
-    ?PRINT(Ty),
     Opened = hm:openTForall(Ty, M),
-    ?PRINT(Opened),
-    synthapps(Env_, Tvs, Opened, As, ExpectedType, Acc);
-synthapps(Env, Tvs, {funt, _, ArgTs, RetTy}, As, ExpectedType, Acc) when length(As) > 0 ->
+    synth_call(Env_, Tvs, Opened, As, ExpectedType, Acc);
+synth_call(Env, Tvs, {funt, _, ArgTs, RetTy}, As, ExpectedType, Acc) when length(As) > 0 ->
     Acc_ = lists:foldr(fun({A, AT}, Ac)->
         Ac ++ [{A, AT}]
     end, Acc, lists:zip(As, ArgTs)),
-    synthapps(Env, Tvs, RetTy, [], ExpectedType, Acc_);
-synthapps(Env, Tvs, {tMeta, _, Id_m, _, _, _}, As, ExpectedType, Acc) when length(As) > 0 ->
+    synth_call(Env, Tvs, RetTy, [], ExpectedType, Acc_);
+synth_call(Env, Tvs, {tMeta, _, Id_m, _, _, _}, As, ExpectedType, Acc) when length(As) > 0 ->
     {tMeta, _, Id_m, Tvs_m, Type, Mono} = env:get_meta(Env, Id_m),
     case Type of
         null  -> 
@@ -458,12 +456,12 @@ synthapps(Env, Tvs, {tMeta, _, Id_m, _, _, _}, As, ExpectedType, Acc) when lengt
             Env_ = env:set_meta(Env_B, Id_m, {tMeta, 0, Id_m, Tvs_m, Ty_Type, Mono}),
             [TM | AsTail] = As,
             Acc_ = Acc ++ [{TM, A}],
-            synthapps(Env_, Tvs, B, AsTail, ExpectedType, Acc_);
-        Valid -> synthapps(Env, Tvs, Valid, As, ExpectedType, Acc)
+            synth_call(Env_, Tvs, B, AsTail, ExpectedType, Acc_);
+        Valid -> synth_call(Env, Tvs, Valid, As, ExpectedType, Acc)
     end;
-synthapps(_, _, SynthFailTy, As, _, _) when length(As) > 0 ->
-    terr("synthapps failed, not a function type: " ++ showType(SynthFailTy));
-synthapps(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
+synth_call(_, _, SynthFailTy, As, _, _) when length(As) > 0 ->
+    terr("synth_call failed, not a function type: " ++ showType(SynthFailTy));
+synth_call(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
     Env__ = case ExpectedType of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
         NotNull ->
@@ -510,7 +508,7 @@ check(Env, Tvs, {abs, Name, Body}, {funt, _, [Left], Right}) ->
 check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     {Env_, FTy} = synth(Env, Tvs, FT),
-    synthapps(Env_, Tvs, FTy, As, Ty, []);
+    synth_call(Env_, Tvs, FTy, As, Ty, []);
 check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
     {Env_1, _} = check(Env, Tvs, Cond, tBool()),
     {Env_2, _} = check(Env_1, Tvs, TB, Ty),
@@ -540,12 +538,12 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    ?PRINT(FunQName),
+    % ?PRINT(FunQName),
     % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     % ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
-    ?PRINT(GenSpecT),
+    % ?PRINT(GenSpecT),
     {Env_, Type} = bd_check(Env, [], F, GenSpecT),
     {Env, Type}.
     % case Result of
@@ -572,12 +570,6 @@ do_btc_infer(Env, F) ->
     % ?PRINT(Env_),
     {ExtendedEnv, PTy}.
 
-% bd_check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
-%     {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
-%     case Type of
-%         null -> synthAndSubsume(Env, Tvs, Term, Ty);
-%         ValidType -> bd_check(Env, Tvs, Term, ValidType)
-%     end;
 bd_check(Env, Tvs, {var, L, X}, Type) ->
     case env:is_bound(X, Env) of
         true  ->
@@ -605,8 +597,6 @@ bd_check(Env, Tvs, {clause, L, _, _, _}=Clause, {funt, _, ArgTys, RetTy} = FT) -
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
     Env_ = lists:foldr(fun({P, T}, Ei)->
-        ?PRINT(P),
-        ?PRINT(T),
         % env:extend(P, T, Ei)
         {Ei_, _} = bd_check(Ei, Tvs, P, T),
         Ei_
@@ -616,10 +606,8 @@ bd_check(Env, Tvs, {clause, L, _, _, _}=Clause, {funt, _, ArgTys, RetTy} = FT) -
 bd_check(Env, Tvs, {call, L, F, Args}= Term, Ty) ->
     {Env_0, FTy}= synthFnCall(Env, F, length(Args)),
     Gen_FT = genFnCallTy(Env, FTy),
-    ?PRINT(Args),
-    ?PRINT(Gen_FT),
     % {Env_, FTy} = synthFnCall(Env, Tvs, F),
-    synthapps(Env_0, Tvs, Gen_FT, Args, Ty, []);
+    synth_call(Env_0, Tvs, Gen_FT, Args, Ty, []);
 bd_check(Env, Tvs, Node, Type) ->
         case type(Node) of
             Fun when Fun =:= function; Fun =:= fun_expr ->
@@ -790,7 +778,6 @@ bd_check(Env, Tvs, Node, Type) ->
 %             synthAndSubsume(Env, Tvs, Node, Type)
 %     end.
 
-
 -spec btc_synth(hm:env(), [any()], erl_syntax:syntaxTree()) ->
     {hm:env(), hm:type()}.
 btc_synth(Env, _Tvs, {integer, L, _}) ->
@@ -839,13 +826,9 @@ btc_synth(Env, Tvs, {var, L, X}) ->
     case env:is_bound(X, Env) of
         true  ->
             T = lookup(X, Env, L),
-            % ?PRINT(X),
-            % ?PRINT(T),
             {Env, T};
         false ->
             {Env_, A} = hm:freshTMeta(Env, Tvs, true, 0),
-            % ?PRINT(X),
-            % ?PRINT(A),
             {env:extend(X, A, Env_), A}
     end;
     % {op,11,'not',{var,11,'X'}}
