@@ -714,6 +714,8 @@ generalizeType (Type) ->
 generalizeTMeta ([], T) -> T;
 generalizeTMeta ([TM|TMs], T) -> {forall, {tvar,getLn(T), TM}, [], generalizeTMeta(TMs, T)}.
 
+getListType(_Env, {bt, _, any}=T) -> T;
+getListType(_Env, {bt, _, term}=T) -> T;
 getListType(_Env, {tcon, _, "List", [LType]}) ->
     LType;
 getListType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
