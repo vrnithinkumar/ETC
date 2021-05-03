@@ -11,6 +11,6 @@ foo(X,Y) -> foo(), foo(X).
 
 foo(X,Y,Z) -> foo(), foo(X), foo(X,Y).
 
-% bar() -> bar(1).
+bar() -> bar(1).
 
-% bar(X) -> bar().
+bar(X) -> bar().

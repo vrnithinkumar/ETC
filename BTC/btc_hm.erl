@@ -447,6 +447,7 @@ infer(Env, Term) ->
 v(N) -> var(N).
 tv(N) -> tVar(N).
 tid() -> tForall("t", tFun(tv("t"), tv("t"))).
+idf() -> abs("x", v("x")).
 listT(T) -> tApp(tv("List"), T).
 st(S, T) -> tApp(tApp(tv("ST"), S), T).
 pair(A, B) -> tApp(tApp(tv("Pair"), A), B).
@@ -578,12 +579,13 @@ basic_tests() ->
 
 tests_full_infer() ->
     % Term = app(app(v("choose"), v("Nil")), v("ids")),
-    Term = app(app(v("revapp"), v("argST")), v("runST")),
+    % Term = app(app(v("revapp"), v("argST")), v("runST")),
     % Term = v("k"),
     % Term = v("h"),
     % Term = v("l"),
     % Term = app(app(v("k"), v("h")), v("l")), % X
-    % Term = abs("x", c_bool()),
+    Term = ann(abs("x", app(v("x"), c_bool())), tFun(tid(), tBool())),
+    % Term = ann(abs("x", c_bool()), tid()),
     % Term = func("foo", "x", app(v("foo"), v("x"))),
     % Term = if_else(c_bool(), c_bool(), c_bool()),
     % Term = ann(if_else(c_bool(), c_bool(), v("id")), tBool()),

@@ -14,7 +14,7 @@
 -export([get_fn_args/1, get_fn_rt/1, generalizeSpecT/2]).
 -export([getListType/2, getTupleType/2, metaTupleTypeOfN/3]).
 -export([substTVar/3, openTForall/2]).
--export([inplaceUDT/2]).
+-export([inplaceUDT/2, rankNSpec/2]).
 -export_type([constraint/0,type/0]).
 
 -type tvar() :: any().
@@ -859,3 +859,53 @@ canInplace ({whilst, _, T}) -> canInplace(T);
 canInplace ({tMeta, _, _, _, _, _} = TM) -> false;
 canInplace ({tSkol, _, _}) -> false;
 canInplace (NotSupported) -> ?PRINT(NotSupported), false.
+
+% rankNSpec(Env, Type)
+rankNSpec ({bt, _, _} = T, _) -> T;
+rankNSpec ({tvar, _, _} = T, _) -> T;
+rankNSpec ({funt, L, Args, Ret}=T, GFree) ->
+    FreeInFT = free(T),
+    FreeRT = free(Ret),
+    FreeArgs = freeInArgs(Args),
+    case sets:is_empty(FreeInFT) of
+        false ->
+            NewArgs = lists:map(fun(Arg)->
+                FR = sets:union(FreeRT, freeExcept(Args, Arg)),
+                rankNSpec(Arg, FR)
+            end, Args),
+            NewRet = rankNSpec(Ret, FreeArgs),
+            NewFT = {funt, L, NewArgs, NewRet},
+            NewFreeInFT = free(NewFT),
+            case sets:is_disjoint(NewFreeInFT, GFree) of
+                true  ->
+                    addExistential(NewFT);
+                false ->
+                    NewFT
+            end;
+        true -> T
+    end;
+rankNSpec ({tcon, L, Name, Args} = T, _) ->
+    FreeInT = free(T),
+    case sets:is_empty(FreeInT) of
+        false ->
+            NewArgs = lists:map(fun(Arg)->
+                FR = freeExcept(Args, Arg),
+                rankNSpec(Arg, FR)
+            end, Args),
+            {tcon, L, Name, NewArgs};
+        true -> T
+    end;
+rankNSpec (NotSupported, _) -> ?PRINT(NotSupported), NotSupported.
+
+freeExcept(Types, Type) ->
+    NTypes = Types -- [Type],
+    freeInArgs(NTypes).
+
+freeInArgs(NTypes) ->
+    lists:foldr(fun(T, Acc) ->
+            sets:union(free(T),Acc)
+        end, sets:new(), NTypes).
+
+addExistential(Type) ->
+    MonoVars = free(Type),
+    bindTV(sets:to_list(MonoVars),Type).

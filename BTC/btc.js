@@ -35,12 +35,14 @@ const fromArray = a => {
 
 // terms
 const Var = name => ({ tag: 'Var', name });
+const Const = name => ({ tag: 'Const', name });
 const Abs = (name, body) => ({ tag: 'Abs', name, body });
 const App = (left, right) => ({ tag: 'App', left, right });
 const Ann = (term, type) => ({ tag: 'Ann', term, type });
 
 const showTerm = t => {
   if (t.tag === 'Var') return t.name;
+  if (t.tag === 'Const') return `C(${t.name})`;
   if (t.tag === 'Abs') return `(\\${t.name}. ${showTerm(t.body)})`;
   if (t.tag === 'App')
     return `(${showTerm(t.left)} ${showTerm(t.right)})`;
@@ -59,6 +61,7 @@ const flattenApp = t => {
 
 // types
 const TVar = name => ({ tag: 'TVar', name });
+const TConst = name => ({ tag: 'TConst', name });
 const TForall = (name, body) => ({ tag: 'TForall', name, body });
 const TFun = (left, right) => ({ tag: 'TFun', left, right });
 const TApp = (left, right) => ({ tag: 'TApp', left, right });
@@ -75,6 +78,7 @@ const freshTSkol = () => TSkol(_tskolid++);
 
 const showType = t => {
   if (t.tag === 'TVar') return t.name;
+  if (t.tag === 'TConst') return t.name;
   if (t.tag === 'TMeta')
     return `?${t.mono ? '`' : ''}${t.id}${showList(t.tvs)}${t.type ? `{${showType(t.type)}}` : ''}`;
   if (t.tag === 'TSkol') return `'${t.id}`;
@@ -140,6 +144,7 @@ const unify = (tvs, a, b) => {
   //console.log(`unify ${showType(a)} ~ ${showType(b)}`);
   if (a === b) return;
   if (a.tag === 'TVar' && b.tag === 'TVar' && a.name === b.name) return;
+  if (a.tag === 'TConst' && b.tag === 'TConst' && a.name === b.name) return;
   if (a.tag === 'TFun' && b.tag === 'TFun') {
     unify(tvs, a.left, b.left);
     unify(tvs, a.right, b.right);
@@ -175,6 +180,9 @@ const subsume = (tvs, a, b) => {
 // inference
 const synth = (env, tvs, t) => {
   //console.log(`synth ${showTerm(t)}`);
+  if (t.tag === 'Const') {
+    return TConst(t.name);
+  }
   if (t.tag === 'Var') {
     const ty = lookup(env, t.name);
     if (!t) return terr(`undefined var ${t.name}`);
@@ -307,47 +315,50 @@ const env = fromArray([
 
 [
   // A
-  Abs('x', Abs('y', v('x'))),
-  App(v('choose'), v('id')),
-  Ann(App(v('choose'), v('id')), TFun(tid, tid)),
-  App(App(v('choose'), v('Nil')), v('ids')),
-  App(v('id'), v('auto')),
-  App(v('id'), v('auto2')),
-  App(App(v('choose'), v('id')), v('auto')),
-  App(App(v('choose'), v('id')), v('auto2')), // X
-  App(App(v('f'), App(v('choose'), v('id'))), v('ids')), // X
-  App(App(v('f'), Ann(App(v('choose'), v('id')), TFun(tid, tid))), v('ids')),
-  App(v('poly'), v('id')),
-  App(v('poly'), Abs('x', v('x'))),
-  App(App(v('id'), v('poly')), Abs('x', v('x'))),
+  // Abs('x', Abs('y', v('x'))),
+  // App(v('choose'), v('id')),
+  // Ann(App(v('choose'), v('id')), TFun(tid, tid)),
+  // Const("Bool"),
+  // Ann(Const("Bool"), TConst("Bool")),
+  Ann(Abs('x', App(v('x'), Const("Bool"))), TFun(tid, TConst("Bool"))),
+  // App(App(v('choose'), v('Nil')), v('ids')),
+  // App(v('id'), v('auto')),
+  // App(v('id'), v('auto2')),
+  // App(App(v('choose'), v('id')), v('auto')),
+  // App(App(v('choose'), v('id')), v('auto2')), // X
+  // App(App(v('f'), App(v('choose'), v('id'))), v('ids')), // X
+  // App(App(v('f'), Ann(App(v('choose'), v('id')), TFun(tid, tid))), v('ids')),
+  // App(v('poly'), v('id')),
+  // App(v('poly'), Abs('x', v('x'))),
+  // App(App(v('id'), v('poly')), Abs('x', v('x'))),
 
-  // B
+  // // B
 
   // C
-  App(v('length'), v('ids')),
-  App(v('tail'), v('ids')),
-  App(v('head'), v('ids')),
-  App(v('single'), v('id')),
-  Ann(App(v('single'), v('id')), List(tid)),
-  App(App(v('Cons'), v('id')), v('ids')),
-  App(App(v('Cons'), Abs('x', v('x'))), v('ids')),
-  App(App(v('append'), App(v('single'), v('inc'))), App(v('single'), v('id'))),
-  App(App(v('g'), App(v('single'), v('id'))), v('ids')), // X
-  App(App(v('g'), Ann(App(v('single'), v('id')), List(tid))), v('ids')),  
-  App(App(v('map'), v('poly')), App(v('single'), v('id'))),
-  App(App(v('map'), v('head')), App(v('single'), v('ids'))),
+  // App(v('length'), v('ids')),
+  // App(v('tail'), v('ids')),
+  // App(v('head'), v('ids')),
+  // App(v('single'), v('id')),
+  // Ann(App(v('single'), v('id')), List(tid)),
+  // App(App(v('Cons'), v('id')), v('ids')),
+  // App(App(v('Cons'), Abs('x', v('x'))), v('ids')),
+  // App(App(v('append'), App(v('single'), v('inc'))), App(v('single'), v('id'))),
+  // App(App(v('g'), App(v('single'), v('id'))), v('ids')), // X
+  // App(App(v('g'), Ann(App(v('single'), v('id')), List(tid))), v('ids')),  
+  // App(App(v('map'), v('poly')), App(v('single'), v('id'))),
+  // App(App(v('map'), v('head')), App(v('single'), v('ids'))),
 
-  // D
-  App(App(v('app'), v('poly')), v('id')),
-  App(App(v('revapp'), v('id')), v('poly')),
-  App(v('runST'), v('argST')),
-  App(App(v('app'), v('runST')), v('argST')),
-  App(App(v('revapp'), v('argST')), v('runST')),
+  // // D
+  // App(App(v('app'), v('poly')), v('id')),
+  // App(App(v('revapp'), v('id')), v('poly')),
+  // App(v('runST'), v('argST')),
+  // App(App(v('app'), v('runST')), v('argST')),
+  // App(App(v('revapp'), v('argST')), v('runST')),
 
-  // E
-  App(App(v('k'), v('h')), v('l')), // X
-  App(App(v('k'), Abs('x', App(v('h'), v('x')))), v('l')),
-  App(v('r'), Abs('x', Abs('y', v('y')))),
+  // // E
+  // App(App(v('k'), v('h')), v('l')), // X
+  // App(App(v('k'), Abs('x', App(v('h'), v('x')))), v('l')),
+  // App(v('r'), Abs('x', Abs('y', v('y')))),
 ].forEach(t => {
   try {
     const ty = infer(env, t);
