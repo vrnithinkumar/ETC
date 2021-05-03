@@ -962,8 +962,8 @@ specToType(Env, {QFName, Types}) ->
     SpecT = hd(lists:map(fun node2type/1, Types)),
     % ?PRINT(SpecT),
     InPlaced = hm:inplaceUDT(Env, SpecT),
-    % ?PRINT(InPlaced),
-    {QFName, InPlaced}.
+    RnkNSpec = hm:rankNSpec(InPlaced, sets:new()),
+    {QFName, RnkNSpec}.
 
 checkWithSpec(Spec, X, T) ->
     SpecTs = spec:lookup(X, Spec),

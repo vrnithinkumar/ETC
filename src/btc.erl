@@ -202,15 +202,15 @@ unify(Env, Tvs, A , {tMeta, _, Id_m, _, _, _}) ->
     unifyTMeta(Env, Tvs, A, B);
 unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
     %% union subtype unify
-    ?PRINT(A),
-    ?PRINT(B),
+    % ?PRINT(A),
+    % ?PRINT(B),
     case unionSubsume(Env, Tvs, A, B) of 
         uni_failed -> unifyFailed(A, B);
         Res -> Res
     end;
 unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
-    ?PRINT(A),
-    ?PRINT(B),
+    % ?PRINT(A),
+    % ?PRINT(B),
     case unionSubsume(Env, Tvs, A, B) of 
         uni_failed -> unifyFailed(A, B);
         Res -> Res
@@ -413,7 +413,7 @@ synth(Env, Tvs, {ann, Term, Type}) ->
 synth(Env, Tvs, {app, _Left, _Right}=Term) ->
     {FT, As} = flattenApp(Term),
     {Env_, Ty} = synth(Env, Tvs, FT),
-    synthapps(Env_, Tvs, Ty, As, null, []);
+    synth_call(Env_, Tvs, Ty, As, null, []);
 synth(Env, Tvs, {abs, Name, Body}) ->
     {Env_1, A} = hm:freshTMeta(Env, Tvs, true, 0),
     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
@@ -435,14 +435,16 @@ synth(Env, Tvs, {if_else, Cond, TB, FB}) ->
 synth(_, _, Term) ->
     terr("cannot synth : " ++ showAny(Term)).
 
-synthapps(Env, Tvs, {forall, _, _, _} = Ty, As, ExpectedType, Acc) ->
+synth_call(Env, Tvs, {forall, _, _, _} = Ty, As, ExpectedType, Acc) ->
     {Env_, M}= hm:freshTMeta(Env, Tvs, 0),
-    synthapps(Env_, Tvs, hm:openTForall(Ty, M), As, ExpectedType, Acc);
-synthapps(Env, Tvs, {funt, _, [Left], Right}, As, ExpectedType, Acc) when length(As) > 0 ->
-    [TM | AsTail] = As,
-    Acc_ = Acc ++ [{TM, Left}],
-    synthapps(Env, Tvs, Right, AsTail, ExpectedType, Acc_);
-synthapps(Env, Tvs, {tMeta, _, Id_m, _, _, _}, As, ExpectedType, Acc) when length(As) > 0 ->
+    Opened = hm:openTForall(Ty, M),
+    synth_call(Env_, Tvs, Opened, As, ExpectedType, Acc);
+synth_call(Env, Tvs, {funt, _, ArgTs, RetTy}, As, ExpectedType, Acc) when length(As) > 0 ->
+    Acc_ = lists:foldr(fun({A, AT}, Ac)->
+        Ac ++ [{A, AT}]
+    end, Acc, lists:zip(As, ArgTs)),
+    synth_call(Env, Tvs, RetTy, [], ExpectedType, Acc_);
+synth_call(Env, Tvs, {tMeta, _, Id_m, _, _, _}, As, ExpectedType, Acc) when length(As) > 0 ->
     {tMeta, _, Id_m, Tvs_m, Type, Mono} = env:get_meta(Env, Id_m),
     case Type of
         null  -> 
@@ -454,12 +456,12 @@ synthapps(Env, Tvs, {tMeta, _, Id_m, _, _, _}, As, ExpectedType, Acc) when lengt
             Env_ = env:set_meta(Env_B, Id_m, {tMeta, 0, Id_m, Tvs_m, Ty_Type, Mono}),
             [TM | AsTail] = As,
             Acc_ = Acc ++ [{TM, A}],
-            synthapps(Env_, Tvs, B, AsTail, ExpectedType, Acc_);
-        Valid -> synthapps(Env, Tvs, Valid, As, ExpectedType, Acc)
+            synth_call(Env_, Tvs, B, AsTail, ExpectedType, Acc_);
+        Valid -> synth_call(Env, Tvs, Valid, As, ExpectedType, Acc)
     end;
-synthapps(_, _, SynthFailTy, As, _, _) when length(As) > 0 ->
-    terr("synthapps failed, not a function type: " ++ showType(SynthFailTy));
-synthapps(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
+synth_call(_, _, SynthFailTy, As, _, _) when length(As) > 0 ->
+    terr("synth_call failed, not a function type: " ++ showType(SynthFailTy));
+synth_call(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
     Env__ = case ExpectedType of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
         NotNull ->
@@ -506,7 +508,7 @@ check(Env, Tvs, {abs, Name, Body}, {funt, _, [Left], Right}) ->
 check(Env, Tvs, {app, _, _} = Term, Ty) ->
     {FT, As} = flattenApp(Term),
     {Env_, FTy} = synth(Env, Tvs, FT),
-    synthapps(Env_, Tvs, FTy, As, Ty, []);
+    synth_call(Env_, Tvs, FTy, As, Ty, []);
 check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
     {Env_1, _} = check(Env, Tvs, Cond, tBool()),
     {Env_2, _} = check(Env_1, Tvs, TB, Ty),
@@ -536,13 +538,13 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    ?PRINT(FunQName),
-    ?PRINT(SpecFT),
+    % ?PRINT(FunQName),
+    % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
-    ?PRINT(UdtInTy),
+    % ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
-    ?PRINT(GenSpecT),
-    {Env_, Type} = btc_check(Env, [], F, GenSpecT),
+    % ?PRINT(GenSpecT),
+    {Env_, Type} = bd_check(Env, [], F, GenSpecT),
     {Env, Type}.
     % case Result of
     %     false -> erlang:error({type_error
@@ -568,8 +570,67 @@ do_btc_infer(Env, F) ->
     % ?PRINT(Env_),
     {ExtendedEnv, PTy}.
 
--spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
-    {hm:env(),  hm:type()}.
+bd_check(Env, Tvs, {var, L, X}, Type) ->
+    case env:is_bound(X, Env) of
+        true  ->
+            VarT = lookup(X, Env, L),
+            subsume(Env, Tvs, VarT, Type);
+        false ->
+            VarT = hm:replaceLn(Type, L),
+            Env_ = env:extend(X, VarT, Env),
+            {Env_, VarT}
+    end;
+bd_check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
+    {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
+    case Type of
+        null -> synthAndSubsume(Env, Tvs, Term, Ty);
+        ValidType -> bd_check(Env, Tvs, Term, ValidType)
+    end;
+bd_check(Env, Tvs, Term, {forall, {tvar,L,_}, _, _} = Ty) ->
+    Sk = hm:freshTSkol(L),
+    % ?PRINT(Sk),
+    {tSkol, _, SkId} = Sk,
+    Opened = hm:openTForall(Ty, Sk),
+    % ?PRINT(Opened),
+    bd_check(Env, [SkId] ++ Tvs, Term, Opened);
+bd_check(Env, Tvs, {clause, L, _, _, _}=Clause, {funt, _, ArgTys, RetTy} = FT) ->
+    ClausePatterns = clause_patterns(Clause),
+    ClauseBody = clause_body(Clause),
+    Env_ = lists:foldr(fun({P, T}, Ei)->
+        % env:extend(P, T, Ei)
+        {Ei_, _} = bd_check(Ei, Tvs, P, T),
+        Ei_
+    end, Env, lists:zip(ClausePatterns, ArgTys)),
+    Env_2 = inferClauseBody(Env_, Tvs, ClauseBody),
+    bd_check(Env_2, Tvs, lists:last(ClauseBody), RetTy);
+bd_check(Env, Tvs, {call, L, F, Args}= Term, Ty) ->
+    {Env_0, FTy}= synthFnCall(Env, F, length(Args)),
+    Gen_FT = genFnCallTy(Env, FTy),
+    % {Env_, FTy} = synthFnCall(Env, Tvs, F),
+    synth_call(Env_0, Tvs, Gen_FT, Args, Ty, []);
+bd_check(Env, Tvs, Node, Type) ->
+        case type(Node) of
+            Fun when Fun =:= function; Fun =:= fun_expr ->
+                Clauses = case Fun of
+                    function -> function_clauses(Node);
+                    fun_expr -> fun_expr_clauses(Node)
+                end,
+                ClausesCheckRes = lists:map(fun(C) -> bd_check(Env, Tvs, C, Type) end, Clauses),
+                % ?PRINT(ClausesCheckRes),
+                % Result = lists:foldl(
+                %     fun({_Env, Res, _T}, AccRes) ->
+                %         AccRes and Res
+                %     end, true, ClausesCheckRes),
+                {Env, Type};
+            _ ->
+                % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
+                % ?PRINT(Node),
+                synthAndSubsume(Env, Tvs, Node, Type)
+        end.
+
+
+% -spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
+%     {hm:env(),  hm:type()}.
 % btc_check(Env, Tvs, {integer,L,_}, Type) ->
 %     Inf = hm:bt(integer, L),
 %     subsume(Env, Tvs, Inf, Type);
@@ -673,50 +734,49 @@ do_btc_infer(Env, F) ->
 %     {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
 %     {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
 %     subsume(Env2, Tvs, RetType, Type);
-btc_check(Env, Tvs, {'case',_,Expr,Clauses}, Type) ->
-    {Env_1, EType} = btc_synth(Env, Tvs, Expr),
-    {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
-    Env_3 = lists:foldr(fun(CT, Ei)->
-        Arg1Type = hd(hm:get_fn_args(CT)),
-        RetType = hm:get_fn_rt(CT),
-        {Ei_1, _} = subsume(Ei, Tvs, Arg1Type, EType),
-        {Ei_2, _} = subsume(Ei_1, Tvs, RetType, Type),
-        Ei_2
-     end, Env_2, CTs),
-    {Env_3, Type};
-btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
-    ClausePatterns = clause_patterns(Clause),
-    ClauseBody = clause_body(Clause),
-    % PatRes = lists:foldl(
-    %     fun(ARes, Res) ->
-    %         ARes and Res
-    %     end, true, PatResults),
-    % ClauseGuards = clause_guard(Node),
-    {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
-    {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
-    BodyType = hm:get_fn_rt(OpenedType),
-    {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
-    {Env_3, Type};
-btc_check(Env, Tvs, Node, Type) ->
-    case type(Node) of
-        Fun when Fun =:= function; Fun =:= fun_expr ->
-            Clauses = case Fun of
-                function -> function_clauses(Node);
-                fun_expr -> fun_expr_clauses(Node)
-            end,
-            ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, Tvs, C, Type) end, Clauses),
-            % ?PRINT(ClausesCheckRes),
-            % Result = lists:foldl(
-            %     fun({_Env, Res, _T}, AccRes) ->
-            %         AccRes and Res
-            %     end, true, ClausesCheckRes),
-            {Env, Type};
-        _ ->
-            % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
-            % ?PRINT(Node),
-            synthAndSubsume(Env, Tvs, Node, Type)
-    end.
-
+% btc_check(Env, Tvs, {'case',_,Expr,Clauses}, Type) ->
+%     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
+%     {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
+%     Env_3 = lists:foldr(fun(CT, Ei)->
+%         Arg1Type = hd(hm:get_fn_args(CT)),
+%         RetType = hm:get_fn_rt(CT),
+%         {Ei_1, _} = subsume(Ei, Tvs, Arg1Type, EType),
+%         {Ei_2, _} = subsume(Ei_1, Tvs, RetType, Type),
+%         Ei_2
+%      end, Env_2, CTs),
+%     {Env_3, Type};
+% btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
+%     ClausePatterns = clause_patterns(Clause),
+%     ClauseBody = clause_body(Clause),
+%     % PatRes = lists:foldl(
+%     %     fun(ARes, Res) ->
+%     %         ARes and Res
+%     %     end, true, PatResults),
+%     % ClauseGuards = clause_guard(Node),
+%     {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
+%     {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
+%     BodyType = hm:get_fn_rt(OpenedType),
+%     {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
+%     {Env_3, Type};
+% btc_check(Env, Tvs, Node, Type) ->
+%     case type(Node) of
+%         Fun when Fun =:= function; Fun =:= fun_expr ->
+%             Clauses = case Fun of
+%                 function -> function_clauses(Node);
+%                 fun_expr -> fun_expr_clauses(Node)
+%             end,
+%             ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, Tvs, C, Type) end, Clauses),
+%             % ?PRINT(ClausesCheckRes),
+%             % Result = lists:foldl(
+%             %     fun({_Env, Res, _T}, AccRes) ->
+%             %         AccRes and Res
+%             %     end, true, ClausesCheckRes),
+%             {Env, Type};
+%         _ ->
+%             % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
+%             % ?PRINT(Node),
+%             synthAndSubsume(Env, Tvs, Node, Type)
+%     end.
 
 -spec btc_synth(hm:env(), [any()], erl_syntax:syntaxTree()) ->
     {hm:env(), hm:type()}.
@@ -777,7 +837,7 @@ btc_synth(Env, Tvs, {op, L, UOp, E}) ->
     {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
     Arg1Type = hd(hm:get_fn_args(OpenedType)),
     RetType = hm:get_fn_rt(OpenedType),
-    {Env1, _T1} = btc_check(Env_, Tvs, E, Arg1Type),
+    {Env1, _T1} = bd_check(Env_, Tvs, E, Arg1Type),
     {Env1, RetType};
 btc_synth(Env, Tvs, {op, L, BOp, E1, E2}) ->
     OpType = lookup(BOp, Env, L),
@@ -785,8 +845,8 @@ btc_synth(Env, Tvs, {op, L, BOp, E1, E2}) ->
     Arg1Type = hd(hm:get_fn_args(OpenedType)),
     Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
     RetType = hm:get_fn_rt(OpenedType),
-    {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
-    {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
+    {Env1, _T1} = bd_check(Env_, Tvs, E1, Arg1Type),
+    {Env2, _T2} = bd_check(Env1, Tvs, E2, Arg2Type),
     {Env2, RetType};
 btc_synth(Env, Tvs, {call,L,F,Args}) ->
     {Env_0, FT }= synthFnCall(Env, F, length(Args)),
@@ -799,7 +859,7 @@ btc_synth(Env, Tvs, {call,L,F,Args}) ->
     ArgTypes = hm:get_fn_args(OpenedType),
     {Env_3, ArgTys} = lists:foldl(
         fun({Arg, ArgTy}, {Ei, ATs}) ->
-            {Ei_, T} = btc_check(Ei, Tvs, Arg, ArgTy),
+            {Ei_, T} = bd_check(Ei, Tvs, Arg, ArgTy),
             {Ei_, ATs ++ [T]}
         end
         , {Env_2,[]}, lists:zip(Args, ArgTypes)),
@@ -843,7 +903,7 @@ btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     Env_3 = synth_clause_body(Env_2, Tvs, ClauseBody),
     LstBdy = lists:last(ClauseBody),
     % ?PRINT(LstBdy),
-    {Env_4, _} = btc_check(Env_3, Tvs, LstBdy, B),
+    {Env_4, _} = bd_check(Env_3, Tvs, LstBdy, B),
     FT = hm:funt(As, B, L),
     {Env_4, FT};
 btc_synth(Env, Tvs, Node) ->
@@ -872,7 +932,7 @@ checkPatterns(Env, Tvs, ClausePatterns, Type) ->
     ArgAndTypes = lists:zip(ClausePatterns, ArgTypes),
     {Env_1, ATypes} = lists:foldl(
         fun({ArgPattern, ArgType},{Ei, Args}) ->
-            {Ei_, Arg_} = btc_check(Ei, Tvs, ArgPattern, ArgType),
+            {Ei_, Arg_} = bd_check(Ei, Tvs, ArgPattern, ArgType),
             {Ei_, Args ++ [Arg_]}
         end, {PatCheckEnv, []}, ArgAndTypes),
     {env:resetPatternInf(Env_1), ATypes}.
@@ -894,7 +954,16 @@ checkClauseBody(Env, Tvs, BodyExprs, Type) ->
     end, EnvUnionEn, lists:droplast(BodyExprs)),
     EnvUnionDis = env:disableClauseUnion(Env_),
     Last = lists:last(BodyExprs),
-    btc_check(EnvUnionDis, Tvs, Last, Type).
+    bd_check(EnvUnionDis, Tvs, Last, Type).
+
+inferClauseBody(Env, Tvs, BodyExprs) ->
+    % TODO: We have to add support for let recursively here
+    EnvUnionEn = env:enableClauseUnion(Env),
+    Env_ = lists:foldr(fun(Expr, Ei) ->
+        {Ei_, _} = btc_synth(Ei, Tvs, Expr),
+        Ei_
+    end, EnvUnionEn, lists:droplast(BodyExprs)),
+    env:disableClauseUnion(Env_).
 
 % -spec localConstraintSolver(hm:env(), [hm:constraint()], [hm:predicate()]) ->
 %     hm:env().
@@ -934,9 +1003,12 @@ isFuncVar({var, _, FName}) when is_atom(FName) ->
     IsUS = (FC == $_),
     IsUS or IsCap.
 
-genAndOpenFnCallTy(Env, Tvs, FnTy) ->
+genFnCallTy(Env, FnTy) ->
     Fresh_FT = hm:generalizeType(FnTy),
-    Gen_FT = hm:generalizeSpecT(Env, Fresh_FT),
+    hm:generalizeSpecT(Env, Fresh_FT).
+
+genAndOpenFnCallTy(Env, Tvs, FnTy) ->
+    Gen_FT = genFnCallTy(Env, FnTy),
     open_op_type(Env, Tvs, Gen_FT).
 
 %% Look up for function type and specialize
@@ -1011,6 +1083,26 @@ open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
 open_op_type(Env, _, OpType) ->
     % ?PRINT(OpType),
     {Env, OpType}.
+
+% open_op_type_Skol(Env, Tvs, {forall, _, C, _} = Ty) ->
+%     {Env_1, M} = hm:freshTMeta(Env, Tvs, true, 0), % TODO:why true no idea?
+%     Sk = hm:freshTSkol(0),
+%     Env_2 = case C of
+%         [{class, CName, _ }] ->
+%             CUT = type_class_to_union(CName),
+%             update_tmeta_type(Env_1, M, CUT);
+%         _ -> Env_1
+%     end,
+%     % ?PRINT(Ty),
+%     Opened = hm:openTForall(Ty, M),
+%     % ?PRINT(Opened),
+%     % ?PRINT(Opened),
+%     open_op_type_Skol(Env_2, Tvs, Opened);
+% open_op_type_Skol(Env, _, OpType) ->
+%     % ?PRINT(OpType),
+%     {Env, OpType}.
+%     {tSkol, _, SkId} = Sk,
+%     check(Env, [SkId] ++ Tvs, Term, hm:openTForall(Ty, Sk));
 
 update_tmeta_type(Env, {tMeta, L, Id_t, Tvs_t, _, Mono}, Type)->
     NewMeta = {tMeta, L, Id_t, Tvs_t, Type, Mono},
