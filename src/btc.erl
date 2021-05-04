@@ -401,46 +401,46 @@ subsume(Env, Tvs, Inf, Ty) ->
     unify(Env, Tvs, Inf, Ty).
 
 % Inference/ Synthesis
-synth(Env, _Tvs, {const, bool}) ->
-    {Env, tBool()};
-synth(Env, _Tvs, {var, Name}) ->
-    case env:lookup(Name, Env) of
-        not_found -> terr("undefined var : " ++  Name);
-        Ty -> {Env, Ty}
-    end;
-synth(Env, Tvs, {ann, Term, Type}) ->
-    check(Env, Tvs, Term, Type);
-synth(Env, Tvs, {app, _Left, _Right}=Term) ->
-    {FT, As} = flattenApp(Term),
-    {Env_, Ty} = synth(Env, Tvs, FT),
-    synth_call(Env_, Tvs, Ty, As, null, []);
-synth(Env, Tvs, {abs, Name, Body}) ->
-    {Env_1, A} = hm:freshTMeta(Env, Tvs, true, 0),
-    {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
-    {Env_3, _} = check(env:extend(Name, A, Env_2), Tvs, Body, B),
-    {Env_3, hm:funt([A], B, 0)};
-synth(Env, Tvs, {func, FName, VName, Body}) ->
-    {Env_1, A} = hm:freshTMeta(Env, Tvs, true, 0),
-    {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
-    FT = hm:funt([A], B, 0),
-    Env_3 = env:extend(FName, FT, Env_2),
-    {Env_4, _} = check(env:extend(VName, A, Env_3), Tvs, Body, B),
-    {Env_4, hm:funt([A], B, 0)};
-synth(Env, Tvs, {if_else, Cond, TB, FB}) ->
-    {Env_1, A} = hm:freshTMeta(Env, Tvs, 0),
-    {Env_2, _} = check(Env_1, Tvs, Cond, tBool()),
-    {Env_3, _} = check(Env_2, Tvs, TB, A),
-    {Env_4, _} = check(Env_3, Tvs, FB, A),
-    {Env_4, A};
-synth(_, _, Term) ->
-    terr("cannot synth : " ++ showAny(Term)).
+% synth(Env, _Tvs, {const, bool}) ->
+%     {Env, tBool()};
+% synth(Env, _Tvs, {var, Name}) ->
+%     case env:lookup(Name, Env) of
+%         not_found -> terr("undefined var : " ++  Name);
+%         Ty -> {Env, Ty}
+%     end;
+% synth(Env, Tvs, {ann, Term, Type}) ->
+%     check(Env, Tvs, Term, Type);
+% synth(Env, Tvs, {app, _Left, _Right}=Term) ->
+%     {FT, As} = flattenApp(Term),
+%     {Env_, Ty} = synth(Env, Tvs, FT),
+%     synth_call(Env_, Tvs, Ty, As, null, []);
+% synth(Env, Tvs, {abs, Name, Body}) ->
+%     {Env_1, A} = hm:freshTMeta(Env, Tvs, true, 0),
+%     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
+%     {Env_3, _} = check(env:extend(Name, A, Env_2), Tvs, Body, B),
+%     {Env_3, hm:funt([A], B, 0)};
+% synth(Env, Tvs, {func, FName, VName, Body}) ->
+%     {Env_1, A} = hm:freshTMeta(Env, Tvs, true, 0),
+%     {Env_2, B} = hm:freshTMeta(Env_1, Tvs, 0),
+%     FT = hm:funt([A], B, 0),
+%     Env_3 = env:extend(FName, FT, Env_2),
+%     {Env_4, _} = check(env:extend(VName, A, Env_3), Tvs, Body, B),
+%     {Env_4, hm:funt([A], B, 0)};
+% synth(Env, Tvs, {if_else, Cond, TB, FB}) ->
+%     {Env_1, A} = hm:freshTMeta(Env, Tvs, 0),
+%     {Env_2, _} = check(Env_1, Tvs, Cond, tBool()),
+%     {Env_3, _} = check(Env_2, Tvs, TB, A),
+%     {Env_4, _} = check(Env_3, Tvs, FB, A),
+%     {Env_4, A};
+% synth(_, _, Term) ->
+%     terr("cannot synth : " ++ showAny(Term)).
 
 synth_call(Env, Tvs, {forall, _, _, _} = Ty, As, ExpectedType, Acc) ->
     {Env_, M}= hm:freshTMeta(Env, Tvs, 0),
     Opened = hm:openTForall(Ty, M),
     synth_call(Env_, Tvs, Opened, As, ExpectedType, Acc);
 synth_call(Env, Tvs, {funt, _, ArgTs, RetTy}, As, ExpectedType, Acc) when length(As) > 0 ->
-    Acc_ = lists:foldr(fun({A, AT}, Ac)->
+    Acc_ = lists:foldl(fun({A, AT}, Ac)->
         Ac ++ [{A, AT}]
     end, Acc, lists:zip(As, ArgTs)),
     synth_call(Env, Tvs, RetTy, [], ExpectedType, Acc_);
@@ -464,8 +464,8 @@ synth_call(_, _, SynthFailTy, As, _, _) when length(As) > 0 ->
 synth_call(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
     Env__ = case ExpectedType of
         null    -> pickAndCheckArgs(Env, Tvs, Acc);
-        NotNull ->
-            {Env_, _T} = unify(Env, Tvs, Ty, NotNull),
+        _       ->
+            {Env_, _T} = unify(Env, Tvs, Ty, ExpectedType),
             pickAndCheckArgs(Env_, Tvs, Acc)
     end,
     {Env__, Ty}.
@@ -474,7 +474,7 @@ synth_call(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
 pickAndCheckArgs(Env, _, []) -> Env;
 pickAndCheckArgs(Env, Tvs, Acc) ->
     {Env_1, {{Tm, TmTy}, RestAcc}} = pickArg(Env, Acc),
-    {Env_2, _T} = check(Env_1, Tvs, Tm, TmTy),
+    {Env_2, _T} = bd_check(Env_1, Tvs, Tm, TmTy),
     pickAndCheckArgs(Env_2, Tvs, RestAcc).
 
 % Bug to check
@@ -493,29 +493,29 @@ pickArg_(Env, Acc_Done, [{F,S} | Acc_Rem]) ->
             {Env_, {{F,S}, Acc_Done ++ Acc_Rem}}
     end.
 
-check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
-    {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
-    case Type of
-        null -> synthAndSubsume(Env, Tvs, Term, Ty);
-        ValidType -> check(Env, Tvs, Term, ValidType)
-    end;
-check(Env, Tvs, Term, {forall, _, _, _} = Ty) ->
-    Sk = hm:freshTSkol(0),
-    {tSkol, _, SkId} = Sk,
-    check(Env, [SkId] ++ Tvs, Term, hm:openTForall(Ty, Sk));
-check(Env, Tvs, {abs, Name, Body}, {funt, _, [Left], Right}) ->
-    check(env:extend(Name, Left, Env), Tvs, Body, Right);
-check(Env, Tvs, {app, _, _} = Term, Ty) ->
-    {FT, As} = flattenApp(Term),
-    {Env_, FTy} = synth(Env, Tvs, FT),
-    synth_call(Env_, Tvs, FTy, As, Ty, []);
-check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
-    {Env_1, _} = check(Env, Tvs, Cond, tBool()),
-    {Env_2, _} = check(Env_1, Tvs, TB, Ty),
-    {Env_3, _} = check(Env_2, Tvs, FB, Ty),
-    {Env_3, Ty};
-check(Env, Tvs, Term, Ty) ->
-    synthAndSubsume(Env, Tvs, Term, Ty).
+% check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
+%     {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
+%     case Type of
+%         null -> synthAndSubsume(Env, Tvs, Term, Ty);
+%         ValidType -> check(Env, Tvs, Term, ValidType)
+%     end;
+% check(Env, Tvs, Term, {forall, _, _, _} = Ty) ->
+%     Sk = hm:freshTSkol(0),
+%     {tSkol, _, SkId} = Sk,
+%     check(Env, [SkId] ++ Tvs, Term, hm:openTForall(Ty, Sk));
+% check(Env, Tvs, {abs, Name, Body}, {funt, _, [Left], Right}) ->
+%     check(env:extend(Name, Left, Env), Tvs, Body, Right);
+% check(Env, Tvs, {app, _, _} = Term, Ty) ->
+%     {FT, As} = flattenApp(Term),
+%     {Env_, FTy} = synth(Env, Tvs, FT),
+%     synth_call(Env_, Tvs, FTy, As, Ty, []);
+% check(Env, Tvs, {if_else, Cond, TB, FB}, Ty) ->
+%     {Env_1, _} = check(Env, Tvs, Cond, tBool()),
+%     {Env_2, _} = check(Env_1, Tvs, TB, Ty),
+%     {Env_3, _} = check(Env_2, Tvs, FB, Ty),
+%     {Env_3, Ty};
+% check(Env, Tvs, Term, Ty) ->
+%     synthAndSubsume(Env, Tvs, Term, Ty).
 
 %% BDTC - End %%
 
@@ -570,6 +570,13 @@ do_btc_infer(Env, F) ->
     % ?PRINT(Env_),
     {ExtendedEnv, PTy}.
 
+bd_check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
+    {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
+    case Type of
+        null -> synthAndSubsume(Env, Tvs, Term, Ty);
+        ValidType -> bd_check(Env, Tvs, Term, ValidType)
+    end;
+%%%%%%%%%%%%%%%%%check with special cases%%%%%%%%%%%%%%%%%
 bd_check(Env, Tvs, {var, L, X}, Type) ->
     case env:is_bound(X, Env) of
         true  ->
@@ -580,12 +587,13 @@ bd_check(Env, Tvs, {var, L, X}, Type) ->
             Env_ = env:extend(X, VarT, Env),
             {Env_, VarT}
     end;
-bd_check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
-    {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
-    case Type of
-        null -> synthAndSubsume(Env, Tvs, Term, Ty);
-        ValidType -> bd_check(Env, Tvs, Term, ValidType)
-    end;
+% Support list of union types
+bd_check(Env, Tvs, {cons, _, Head, Tail}, Type) ->
+    {Env_1, _TailTy} = bd_check(Env, Tvs, Tail, Type),
+    ElemTy = hm:getListType(Env_1, Type),
+    {Env_2, _HT} = bd_check(Env_1, Tvs, Head, ElemTy),
+    {Env_2, Type};
+%%%%%%%%%%%%%%%%%check with special cases%%%%%%%%%%%%%%%%%
 bd_check(Env, Tvs, Term, {forall, {tvar,L,_}, _, _} = Ty) ->
     Sk = hm:freshTSkol(L),
     % ?PRINT(Sk),
@@ -596,7 +604,7 @@ bd_check(Env, Tvs, Term, {forall, {tvar,L,_}, _, _} = Ty) ->
 bd_check(Env, Tvs, {clause, L, _, _, _}=Clause, {funt, _, ArgTys, RetTy} = FT) ->
     ClausePatterns = clause_patterns(Clause),
     ClauseBody = clause_body(Clause),
-    Env_ = lists:foldr(fun({P, T}, Ei)->
+    Env_ = lists:foldl(fun({P, T}, Ei)->
         % env:extend(P, T, Ei)
         {Ei_, _} = bd_check(Ei, Tvs, P, T),
         Ei_
@@ -606,7 +614,6 @@ bd_check(Env, Tvs, {clause, L, _, _, _}=Clause, {funt, _, ArgTys, RetTy} = FT) -
 bd_check(Env, Tvs, {call, L, F, Args}= Term, Ty) ->
     {Env_0, FTy}= synthFnCall(Env, F, length(Args)),
     Gen_FT = genFnCallTy(Env, FTy),
-    % {Env_, FTy} = synthFnCall(Env, Tvs, F),
     synth_call(Env_0, Tvs, Gen_FT, Args, Ty, []);
 bd_check(Env, Tvs, Node, Type) ->
         case type(Node) of
@@ -625,6 +632,7 @@ bd_check(Env, Tvs, Node, Type) ->
             _ ->
                 % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
                 % ?PRINT(Node),
+                % ?PRINT(Type),
                 synthAndSubsume(Env, Tvs, Node, Type)
         end.
 
