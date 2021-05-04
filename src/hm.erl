@@ -139,11 +139,11 @@ eqType({tvar,_,X}, {tvar,_,Y}) -> X == Y;
 eqType({funt,_,As1, B1}, {funt,_,As2, B2}) ->
     eqType(B1,B2) andalso util:eqLists(fun eqType/2,As1,As2);
 eqType({tcon,_,N1,As1},{tcon,_,N2,As2}) ->
-    ?PRINT(As1),
-    ?PRINT(As2),
+    % ?PRINT(As1),
+    % ?PRINT(As2),
     (N1 == N2) andalso util:eqLists(fun eqType/2,As1,As2);
 eqType({tMeta, _, _, Tvs, Type_1, Mono}, {tMeta, _, _, Tvs, Type_2, Mono}) ->
-    ?PRINT(Mono),
+    % ?PRINT(Mono),
     eqType(Type_1, Type_2);
 eqType({tSkol, _, Id}, {tSkol, _, Id}) -> true;
 eqType(_,_) -> false.

@@ -20,32 +20,27 @@
 
 % Helpers for testing
 
-
-% Built In Types
-tBool() -> hm:bt(bool, 0).
-tInt() -> hm:bt(integer, 0).
-
 terr(Reason) -> erlang:error("Type Error: " ++ Reason).
 
-showList([]) -> "";
-showList(List) ->
-    ListToShow = io_lib:format("~p",[List]),
-    lists:flatten(ListToShow).
+% showList([]) -> "";
+% showList(List) ->
+%     ListToShow = io_lib:format("~p",[List]),
+%     lists:flatten(ListToShow).
 
-showAny(Val) ->
-    ListToShow = io_lib:format("~p",[Val]),
-    lists:flatten(ListToShow).
+% showAny(Val) ->
+%     ListToShow = io_lib:format("~p",[Val]),
+%     lists:flatten(ListToShow).
 
-intToChar(Val) ->
-    L = Val + 65,
-    io_lib:format("~c", [L]).
+% intToChar(Val) ->
+%     L = Val + 65,
+%     io_lib:format("~c", [L]).
 
-intToSmallChar(Val) ->
-    L = Val + 97,
-    io_lib:format("~c", [L]).
+% intToSmallChar(Val) ->
+%     L = Val + 97,
+%     io_lib:format("~c", [L]).
 
 subset([A|As], B) ->
-    case lists:member(B, A) of
+    case lists:member(A, B) of
         true  -> subset(As, B);
         false -> false
     end;
@@ -114,11 +109,11 @@ applyEnv(_, T) -> T.
 applyEnvAndPrune(Env, Type) ->
     prune(Env, applyEnv(Env, Type)).
 
-flattenApp({app, Left, Right}) ->
-    {T, Args} = flattenApp (Left),
-    {T, Args ++ [Right]};
-    % {T, [Right] ++ Args};
-flattenApp(T) -> {T, []}.
+% flattenApp({app, Left, Right}) ->
+%     {T, Args} = flattenApp (Left),
+%     {T, Args ++ [Right]};
+%     % {T, [Right] ++ Args};
+% flattenApp(T) -> {T, []}.
 
 % Subtyping
 checkSolution(Env, T, T) -> {Env, false};
@@ -538,7 +533,7 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    % ?PRINT(FunQName),
+    ?PRINT(FunQName),
     % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     % ?PRINT(UdtInTy),
