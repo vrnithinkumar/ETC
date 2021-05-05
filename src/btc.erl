@@ -536,9 +536,9 @@ do_btc_check(Env, F, SpecFT) ->
     ?PRINT(FunQName),
     % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
-    % ?PRINT(UdtInTy),
+    ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
-    % ?PRINT(GenSpecT),
+    ?PRINT(GenSpecT),
     {Env_, Type} = bd_check(Env, [], F, GenSpecT),
     {Env, Type}.
     % case Result of
@@ -615,7 +615,7 @@ bd_check(Env, Tvs, Node, Type) ->
             Fun when Fun =:= function; Fun =:= fun_expr ->
                 Clauses = case Fun of
                     function -> function_clauses(Node);
-                    fun_expr -> fun_expr_clauses(Node)
+                    fun_expr -> ?PRINT(Node), fun_expr_clauses(Node)
                 end,
                 ClausesCheckRes = lists:map(fun(C) -> bd_check(Env, Tvs, C, Type) end, Clauses),
                 % ?PRINT(ClausesCheckRes),
@@ -632,154 +632,6 @@ bd_check(Env, Tvs, Node, Type) ->
         end.
 
 
-% -spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
-%     {hm:env(),  hm:type()}.
-% btc_check(Env, Tvs, {integer,L,_}, Type) ->
-%     Inf = hm:bt(integer, L),
-%     subsume(Env, Tvs, Inf, Type);
-% btc_check(Env, Tvs, {string, L,_}, Type) ->
-%     Inf= hm:tcon("List", [hm:bt(char,L)],L),
-%     subsume(Env, Tvs, Inf, Type);
-% btc_check(Env, Tvs, {char, L,_}, Type) ->
-%     Inf= hm:bt(char,L),
-%     subsume(Env, Tvs, Inf, Type);
-% btc_check(Env, Tvs, {float,L,_}, Type) ->
-%     Inf = hm:bt(float, L),
-%     subsume(Env, Tvs, Inf, Type);
-% btc_check(Env, Tvs, {atom,L,X}, Type) ->
-%     Inf = case X of
-%         B when is_boolean(B) -> hm:bt(boolean, L);
-%         _                    -> hm:bt(atom, L)
-%     end,
-%     subsume(Env, Tvs, Inf, Type);
-% btc_check(Env, Tvs, {nil, L}, Type) ->
-%     {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
-%     ListType = hm:tcon("List", [A], L),
-%     subsume(Env_1, Tvs, ListType, Type);
-% % btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
-% %     % ?PRINT(Head),
-% %     % ?PRINT(Tail),
-% %     % ?PRINT(Type),
-% %     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
-% %     {Env_2, A} = hm:freshTMeta(Env_1, Tvs, L),
-% %     {Env_3, _HT} = btc_check(Env_2, Tvs, Head, A),
-% %     LType = hm:tcon("List", [A], L),
-% %     % {Env_4, LT} = subsume(Env_3, Tvs, LType, TType),
-% %     subsume(Env_3, Tvs, LType, Type);
-% %     % subsume(Env_4, Tvs, LT, Type);
-% btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
-%     ?PRINT(Head),
-%     ?PRINT(Tail),
-%     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
-%     ?PRINT(Type),
-%     ?PRINT(TType),
-%     ElemTy = hm:getListType(Env_1, TType),
-%     {Env_2, _HT} = btc_check(Env_1, Tvs, Head, ElemTy),
-%     {Env_2, Type};
-% btc_check(Env, Tvs, {tuple, L, Es}, Type) ->
-%     % TODO verify how it works with proper type
-%     {Env_1, MetaTup} = hm:metaTupleTypeOfN(Env, length(Es), L),
-%     TTys = hm:getTupleType(Env_1, MetaTup),
-%     {Env_2, _TTs} = lists:foldl(
-%         fun({E, TT}, {Ei, AccT}) ->
-%             {Ei_, T} = btc_check(Ei, Tvs, E, TT),
-%             {Ei_, AccT ++ [T]}
-%         end, {Env_1,[]}, lists:zip(Es, TTys)),
-%     subsume(Env_2, Tvs, MetaTup, Type);
-% btc_check(Env, Tvs, {var, L, '_'}, Type) ->
-%     % Nothing to check
-%     {Env, Type};
-% btc_check(Env, Tvs, {var, L, X}, Type) ->
-%     case env:is_bound(X, Env) of
-%         true  ->
-%             VarT = lookup(X, Env, L),
-%             subsume(Env, Tvs, VarT, Type);
-%             % synthAndSubsume(Env, Tvs, {var, L, X}, Type);
-%             % check_type_var(Env, Type, VarT);
-%         false ->
-%             VarT = hm:replaceLn(Type, L),
-%             Env_ = env:extend(X, VarT, Env),
-%             {Env_, VarT}
-%     end;
-% btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
-%     FT = synthFnCall(Env, F, length(Args)),
-%     {Env_1, OpenedType} = genAndOpenFnCallTy(Env, Tvs, FT),
-%     % ?PRINT(OpenedType),
-%     ArgTypes = hm:get_fn_args(OpenedType),
-%     % Env_ = env:disableGuardExprEnv(Env),
-%     {Env_2, ArgTys} = lists:foldl(
-%         fun({Arg, ArgTy}, {Ei, ATs}) ->
-%             {Ei_, T} = btc_check(Ei, Tvs, Arg, ArgTy),
-%             {Ei_, ATs ++ [T]}
-%         end
-%         , {Env_1, []}, lists:zip(Args, ArgTypes)),
-%     RetType = hm:get_fn_rt(OpenedType),
-%     subsume(Env_2, Tvs, Type, RetType);
-%     % subsume(Env_2, Tvs, RetType, Type); %TODO order we have to fix
-% btc_check(Env, Tvs, {match, L, LNode, RNode} = Node, Type) ->
-%     case env:isPatternInf(Env) of 
-%         false ->
-%             {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
-%             {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
-%             subsume(Env_2, Tvs, LTy, RTy);
-%         true ->
-%             {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
-%             {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
-%             subsume(Env_2, Tvs, RTy, LTy)
-%     end;
-% btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
-%     OpType = lookup(Op, Env, L),
-%     % StrippedType = hm:type_without_bound(OpType),
-%     {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
-%     Arg1Type = hd(hm:get_fn_args(OpenedType)),
-%     Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
-%     RetType = hm:get_fn_rt(OpenedType),
-%     {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
-%     {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
-%     subsume(Env2, Tvs, RetType, Type);
-% btc_check(Env, Tvs, {'case',_,Expr,Clauses}, Type) ->
-%     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
-%     {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
-%     Env_3 = lists:foldr(fun(CT, Ei)->
-%         Arg1Type = hd(hm:get_fn_args(CT)),
-%         RetType = hm:get_fn_rt(CT),
-%         {Ei_1, _} = subsume(Ei, Tvs, Arg1Type, EType),
-%         {Ei_2, _} = subsume(Ei_1, Tvs, RetType, Type),
-%         Ei_2
-%      end, Env_2, CTs),
-%     {Env_3, Type};
-% btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
-%     ClausePatterns = clause_patterns(Clause),
-%     ClauseBody = clause_body(Clause),
-%     % PatRes = lists:foldl(
-%     %     fun(ARes, Res) ->
-%     %         ARes and Res
-%     %     end, true, PatResults),
-%     % ClauseGuards = clause_guard(Node),
-%     {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
-%     {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
-%     BodyType = hm:get_fn_rt(OpenedType),
-%     {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
-%     {Env_3, Type};
-% btc_check(Env, Tvs, Node, Type) ->
-%     case type(Node) of
-%         Fun when Fun =:= function; Fun =:= fun_expr ->
-%             Clauses = case Fun of
-%                 function -> function_clauses(Node);
-%                 fun_expr -> fun_expr_clauses(Node)
-%             end,
-%             ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, Tvs, C, Type) end, Clauses),
-%             % ?PRINT(ClausesCheckRes),
-%             % Result = lists:foldl(
-%             %     fun({_Env, Res, _T}, AccRes) ->
-%             %         AccRes and Res
-%             %     end, true, ClausesCheckRes),
-%             {Env, Type};
-%         _ ->
-%             % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
-%             % ?PRINT(Node),
-%             synthAndSubsume(Env, Tvs, Node, Type)
-%     end.
 
 -spec btc_synth(hm:env(), [any()], erl_syntax:syntaxTree()) ->
     {hm:env(), hm:type()}.
@@ -862,6 +714,8 @@ btc_synth(Env, Tvs, {call,L,F,Args}) ->
     ArgTypes = hm:get_fn_args(OpenedType),
     {Env_3, ArgTys} = lists:foldl(
         fun({Arg, ArgTy}, {Ei, ATs}) ->
+            ?PRINT(Arg),
+            ?PRINT(ArgTy),
             {Ei_, T} = bd_check(Ei, Tvs, Arg, ArgTy),
             {Ei_, ATs ++ [T]}
         end
@@ -881,6 +735,10 @@ btc_synth(Env, Tvs, {'if',_,Clauses}) ->
     {Env_2, CT} = subsume_clauses(Env_1, Tvs, CTs),
     RetType = hm:get_fn_rt(CT),
     {Env_2, RetType};
+btc_synth(Env, Tvs, {'fun',L,{function,X,ArgLen}}=Term) ->
+    ?PRINT(Term),
+    T = lookup({X,ArgLen},Env,L),
+    {Env, T};
 btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
     {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
@@ -1209,3 +1067,154 @@ printType(Env, T) ->
     {_, D_PT} = applyEnvAndPrune(Env, T),
     ?PRINT(D_PT).
 %%%%%%%%%%%%Test & Debug%%%%%%%%%%%%
+
+%%%%%%%Removed%%%%%%%%%%%
+
+% -spec btc_check(hm:env(), [any()], erl_syntax:syntaxTree(), hm:type()) ->
+%     {hm:env(),  hm:type()}.
+% btc_check(Env, Tvs, {integer,L,_}, Type) ->
+%     Inf = hm:bt(integer, L),
+%     subsume(Env, Tvs, Inf, Type);
+% btc_check(Env, Tvs, {string, L,_}, Type) ->
+%     Inf= hm:tcon("List", [hm:bt(char,L)],L),
+%     subsume(Env, Tvs, Inf, Type);
+% btc_check(Env, Tvs, {char, L,_}, Type) ->
+%     Inf= hm:bt(char,L),
+%     subsume(Env, Tvs, Inf, Type);
+% btc_check(Env, Tvs, {float,L,_}, Type) ->
+%     Inf = hm:bt(float, L),
+%     subsume(Env, Tvs, Inf, Type);
+% btc_check(Env, Tvs, {atom,L,X}, Type) ->
+%     Inf = case X of
+%         B when is_boolean(B) -> hm:bt(boolean, L);
+%         _                    -> hm:bt(atom, L)
+%     end,
+%     subsume(Env, Tvs, Inf, Type);
+% btc_check(Env, Tvs, {nil, L}, Type) ->
+%     {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
+%     ListType = hm:tcon("List", [A], L),
+%     subsume(Env_1, Tvs, ListType, Type);
+% % btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
+% %     % ?PRINT(Head),
+% %     % ?PRINT(Tail),
+% %     % ?PRINT(Type),
+% %     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
+% %     {Env_2, A} = hm:freshTMeta(Env_1, Tvs, L),
+% %     {Env_3, _HT} = btc_check(Env_2, Tvs, Head, A),
+% %     LType = hm:tcon("List", [A], L),
+% %     % {Env_4, LT} = subsume(Env_3, Tvs, LType, TType),
+% %     subsume(Env_3, Tvs, LType, Type);
+% %     % subsume(Env_4, Tvs, LT, Type);
+% btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
+%     ?PRINT(Head),
+%     ?PRINT(Tail),
+%     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
+%     ?PRINT(Type),
+%     ?PRINT(TType),
+%     ElemTy = hm:getListType(Env_1, TType),
+%     {Env_2, _HT} = btc_check(Env_1, Tvs, Head, ElemTy),
+%     {Env_2, Type};
+% btc_check(Env, Tvs, {tuple, L, Es}, Type) ->
+%     % TODO verify how it works with proper type
+%     {Env_1, MetaTup} = hm:metaTupleTypeOfN(Env, length(Es), L),
+%     TTys = hm:getTupleType(Env_1, MetaTup),
+%     {Env_2, _TTs} = lists:foldl(
+%         fun({E, TT}, {Ei, AccT}) ->
+%             {Ei_, T} = btc_check(Ei, Tvs, E, TT),
+%             {Ei_, AccT ++ [T]}
+%         end, {Env_1,[]}, lists:zip(Es, TTys)),
+%     subsume(Env_2, Tvs, MetaTup, Type);
+% btc_check(Env, Tvs, {var, L, '_'}, Type) ->
+%     % Nothing to check
+%     {Env, Type};
+% btc_check(Env, Tvs, {var, L, X}, Type) ->
+%     case env:is_bound(X, Env) of
+%         true  ->
+%             VarT = lookup(X, Env, L),
+%             subsume(Env, Tvs, VarT, Type);
+%             % synthAndSubsume(Env, Tvs, {var, L, X}, Type);
+%             % check_type_var(Env, Type, VarT);
+%         false ->
+%             VarT = hm:replaceLn(Type, L),
+%             Env_ = env:extend(X, VarT, Env),
+%             {Env_, VarT}
+%     end;
+% btc_check(Env, Tvs, {call, L, F, Args}, Type) ->
+%     FT = synthFnCall(Env, F, length(Args)),
+%     {Env_1, OpenedType} = genAndOpenFnCallTy(Env, Tvs, FT),
+%     % ?PRINT(OpenedType),
+%     ArgTypes = hm:get_fn_args(OpenedType),
+%     % Env_ = env:disableGuardExprEnv(Env),
+%     {Env_2, ArgTys} = lists:foldl(
+%         fun({Arg, ArgTy}, {Ei, ATs}) ->
+%             {Ei_, T} = btc_check(Ei, Tvs, Arg, ArgTy),
+%             {Ei_, ATs ++ [T]}
+%         end
+%         , {Env_1, []}, lists:zip(Args, ArgTypes)),
+%     RetType = hm:get_fn_rt(OpenedType),
+%     subsume(Env_2, Tvs, Type, RetType);
+%     % subsume(Env_2, Tvs, RetType, Type); %TODO order we have to fix
+% btc_check(Env, Tvs, {match, L, LNode, RNode} = Node, Type) ->
+%     case env:isPatternInf(Env) of 
+%         false ->
+%             {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
+%             {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
+%             subsume(Env_2, Tvs, LTy, RTy);
+%         true ->
+%             {Env_1, LTy} = btc_check(Env, Tvs, LNode, Type),
+%             {Env_2, RTy} = btc_check(Env_1, Tvs, RNode, Type),
+%             subsume(Env_2, Tvs, RTy, LTy)
+%     end;
+% btc_check(Env, Tvs, {op, L, Op, E1, E2}, Type) ->
+%     OpType = lookup(Op, Env, L),
+%     % StrippedType = hm:type_without_bound(OpType),
+%     {Env_, OpenedType} = open_op_type(Env, Tvs, OpType),
+%     Arg1Type = hd(hm:get_fn_args(OpenedType)),
+%     Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
+%     RetType = hm:get_fn_rt(OpenedType),
+%     {Env1, _T1} = btc_check(Env_, Tvs, E1, Arg1Type),
+%     {Env2, _T2} = btc_check(Env1, Tvs, E2, Arg2Type),
+%     subsume(Env2, Tvs, RetType, Type);
+% btc_check(Env, Tvs, {'case',_,Expr,Clauses}, Type) ->
+%     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
+%     {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
+%     Env_3 = lists:foldr(fun(CT, Ei)->
+%         Arg1Type = hd(hm:get_fn_args(CT)),
+%         RetType = hm:get_fn_rt(CT),
+%         {Ei_1, _} = subsume(Ei, Tvs, Arg1Type, EType),
+%         {Ei_2, _} = subsume(Ei_1, Tvs, RetType, Type),
+%         Ei_2
+%      end, Env_2, CTs),
+%     {Env_3, Type};
+% btc_check(Env, Tvs, {clause, L, _, _, _}=Clause, Type) ->
+%     ClausePatterns = clause_patterns(Clause),
+%     ClauseBody = clause_body(Clause),
+%     % PatRes = lists:foldl(
+%     %     fun(ARes, Res) ->
+%     %         ARes and Res
+%     %     end, true, PatResults),
+%     % ClauseGuards = clause_guard(Node),
+%     {Env_1, OpenedType} = open_op_type(Env, Tvs, Type),
+%     {Env_2, PatResults} = checkPatterns(Env_1, Tvs, ClausePatterns, OpenedType),
+%     BodyType = hm:get_fn_rt(OpenedType),
+%     {Env_3, BodyRes} = checkClauseBody(Env_2, Tvs, ClauseBody, BodyType),
+%     {Env_3, Type};
+% btc_check(Env, Tvs, Node, Type) ->
+%     case type(Node) of
+%         Fun when Fun =:= function; Fun =:= fun_expr ->
+%             Clauses = case Fun of
+%                 function -> function_clauses(Node);
+%                 fun_expr -> fun_expr_clauses(Node)
+%             end,
+%             ClausesCheckRes = lists:map(fun(C) -> btc_check(Env, Tvs, C, Type) end, Clauses),
+%             % ?PRINT(ClausesCheckRes),
+%             % Result = lists:foldl(
+%             %     fun({_Env, Res, _T}, AccRes) ->
+%             %         AccRes and Res
+%             %     end, true, ClausesCheckRes),
+%             {Env, Type};
+%         _ ->
+%             % io:fwrite("BTC check is not supported, so using synth and subsume ~n"),
+%             % ?PRINT(Node),
+%             synthAndSubsume(Env, Tvs, Node, Type)
+%     end.
