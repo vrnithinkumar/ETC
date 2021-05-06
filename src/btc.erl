@@ -172,6 +172,21 @@ unify(Env, _Tvs, {tcon, _, "Tuple", []}, {tcon, _, "Tuple", _} = T) ->
     %% Handle the case where empty 'tuple()' type
     %% used for generic and dynamic n-sized tuples.
     {Env, T};
+unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
+    %% union subtype unify
+    % ?PRINT(A),
+    % ?PRINT(B),
+    case unionSubsume(Env, Tvs, A, B) of 
+        uni_failed -> unifyFailed(A, B);
+        Res -> Res
+    end;
+unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
+    % ?PRINT(A),
+    % ?PRINT(B),
+    case unionSubsume(Env, Tvs, A, B) of 
+        uni_failed -> unifyFailed(A, B);
+        Res -> Res
+    end;
 unify(Env, Tvs, {tcon, _, Name, Args_A}, {tcon, _, Name, Args_B}) ->
     % {Env_1, Name} = unify(Env, Tvs, Name_A, Name_B), 
     % TODO: VR do we need this at all?
@@ -195,21 +210,6 @@ unify(Env, Tvs, A , {tMeta, _, Id_m, _, _, _}) ->
     % TODO: Do we need to swap now?
     % unifyTMeta(Env, Tvs, B, A);
     unifyTMeta(Env, Tvs, A, B);
-unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
-    %% union subtype unify
-    % ?PRINT(A),
-    % ?PRINT(B),
-    case unionSubsume(Env, Tvs, A, B) of 
-        uni_failed -> unifyFailed(A, B);
-        Res -> Res
-    end;
-unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
-    % ?PRINT(A),
-    % ?PRINT(B),
-    case unionSubsume(Env, Tvs, A, B) of 
-        uni_failed -> unifyFailed(A, B);
-        Res -> Res
-    end;
 unify(Env, _Tvs, A, B) ->
     {Env_1, A_} = applyEnvAndPrune(Env, A),
     {Env_2, B_} = applyEnvAndPrune(Env_1, B),
@@ -237,6 +237,14 @@ unifyFailed(A, B) ->
     terr("unify failed!").
 
 % A <: (B|C) => (A <: B) or (A <: C)
+% handle empty tmeta
+unionSubsume(Env, Tvs, {tMeta, _, Id_m, _, _, _}= TM, {tcon, _, "Union", _}=RU) ->
+    {tMeta, L, Id_m, Tvs_m, Type, Mono} = env:get_meta(Env, Id_m),
+    case Type of
+        %% Replace incase of empty TMeta
+        null -> {Env, {tMeta, L, Id_m, Tvs_m, RU, Mono}};
+        Type -> unionSubsume(Env, Tvs, Type, RU)
+    end;
 unionSubsume(Env, Tvs, {tcon, _, "Union", L_Types}=L, {tcon, _, "Union", _}=R) ->
     Env_ = lists:foldr(fun(Ty, Ei) ->
         Ei_ = case unionSubsume(Ei, Tvs, Ty, R) of
@@ -251,7 +259,7 @@ unionSubsume(Env, Tvs, A, {tcon, _, "Union", Types}) ->
 unionSubsume(Env, Tvs, {tcon, _, "Union", Types}, R) ->
     trySubsumeLeftUnion(Env, Tvs, R, Types).
 
-trySubsumeRightUnion(_Env, _Tvs, _A, []) -> 
+trySubsumeRightUnion(_Env, _Tvs, _A, []) ->
     uni_failed;
 trySubsumeRightUnion(Env, Tvs, A, [H | Tail]) ->
     case tryUnify(Env, Tvs, A, H) of
@@ -458,7 +466,8 @@ synth_call(_, _, SynthFailTy, As, _, _) when length(As) > 0 ->
     terr("synth_call failed, not a function type: " ++ showType(SynthFailTy));
 synth_call(Env, Tvs, Ty, _As, ExpectedType, Acc) ->
     Env__ = case ExpectedType of
-        null    -> pickAndCheckArgs(Env, Tvs, Acc);
+        null    ->
+            pickAndCheckArgs(Env, Tvs, Acc);
         _       ->
             {Env_, _T} = unify(Env, Tvs, Ty, ExpectedType),
             pickAndCheckArgs(Env_, Tvs, Acc)
@@ -533,12 +542,12 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    ?PRINT(FunQName),
+    % ?PRINT(FunQName),
     % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
-    ?PRINT(UdtInTy),
+    % ?PRINT(UdtInTy),
     GenSpecT = hm:generalizeSpecT(Env, UdtInTy),
-    ?PRINT(GenSpecT),
+    % ?PRINT(GenSpecT),
     {Env_, Type} = bd_check(Env, [], F, GenSpecT),
     {Env, Type}.
     % case Result of
@@ -594,7 +603,6 @@ bd_check(Env, Tvs, Term, {forall, {tvar,L,_}, _, _} = Ty) ->
     % ?PRINT(Sk),
     {tSkol, _, SkId} = Sk,
     Opened = hm:openTForall(Ty, Sk),
-    % ?PRINT(Opened),
     bd_check(Env, [SkId] ++ Tvs, Term, Opened);
 bd_check(Env, Tvs, {clause, L, _, _, _}=Clause, {funt, _, ArgTys, RetTy} = FT) ->
     ClausePatterns = clause_patterns(Clause),
