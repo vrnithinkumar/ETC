@@ -1,8 +1,11 @@
-etc
+ETC
 =====
 
 
-Erlang Type Checker
+Erlang Type Checker Prototype Based on [Bidirectional Typechecking](https://arxiv.org/abs/1908.05839).
+
+Based on the paper ["Complete and Easy Bidirectional Typechecking for Higher-Rank Polymorphism"](https://www.cl.cam.ac.uk/~nk480/bidir.pdf) by Jana Dunfield and Neel Krishnaswami.
+
 Based on [Nachi](https://github.com/nachivpn)'s [ETC](https://github.com/nachivpn/mt)
 
 Build And Use
