@@ -6,7 +6,7 @@ Erlang Type Checker Prototype Based on [Bidirectional Typechecking](https://arxi
 
 Based on the paper ["Complete and Easy Bidirectional Typechecking for Higher-Rank Polymorphism"](https://www.cl.cam.ac.uk/~nk480/bidir.pdf) by Jana Dunfield and Neel Krishnaswami.
 
-Based on [Nachi](https://github.com/nachivpn)'s [ETC](https://github.com/nachivpn/mt)
+Based on and extended [Nachi](https://github.com/nachivpn)'s [ETC](https://github.com/nachivpn/mt)
 
 Build And Use
 -----
