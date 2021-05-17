@@ -216,8 +216,8 @@ unify(Env, _Tvs, A, B) ->
     case hm:isSubType(A_, B_) of
         true-> {Env_2, A};
         false ->
-            ?PRINT(A_),
-            ?PRINT(B_),
+            % ?PRINT(A_),
+            % ?PRINT(B_),
             io:fwrite("unify failed with types "),
             showType(A_),
             io:fwrite(" :=: "),
@@ -722,8 +722,8 @@ btc_synth(Env, Tvs, {call,L,F,Args}) ->
     ArgTypes = hm:get_fn_args(OpenedType),
     {Env_3, ArgTys} = lists:foldl(
         fun({Arg, ArgTy}, {Ei, ATs}) ->
-            ?PRINT(Arg),
-            ?PRINT(ArgTy),
+            % ?PRINT(Arg),
+            % ?PRINT(ArgTy),
             {Ei_, T} = bd_check(Ei, Tvs, Arg, ArgTy),
             {Ei_, ATs ++ [T]}
         end
