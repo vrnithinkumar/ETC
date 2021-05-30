@@ -796,7 +796,12 @@ node2type({type,L,list,Args}) ->
 node2type({type, L, nonempty_list, Args}) ->
     % TODO not sure we have to handle different
     hm:tcon("List", lists:map(fun node2type/1, Args), L);
-node2type({type,L,union,Args}) -> hm:tcon("Union",lists:map(fun node2type/1, Args),L);
+node2type({type,L,union,Args}) -> hm:tcon("Union",lists:map(fun node2type/1, Args), L);
+node2type({type, L, map, any}) ->
+    AnyToAny = hm:tcon("key-value",[hm:bt(any, L), hm:bt(any, L)],L),
+    hm:tcon("map", AnyToAny, L);
+node2type({type, L, map, Args}) ->  hm:tcon("map",lists:map(fun node2type/1, Args), L);
+node2type({type, L, map_field_assoc, Args}) -> hm:tcon("key-value",lists:map(fun node2type/1, Args),L);
 node2type({ann_type,_L,[_TVar, TNode]}) -> node2type(TNode);
 node2type({user_type,L,T,Args}) -> hm:tcon(T,lists:map(fun node2type/1, Args),L);
 node2type({type,L,'fun', [Args, RType]}) -> hm:funt(node2types(Args), node2type(RType), L);
@@ -809,7 +814,10 @@ node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
         % NewVarT = hm:replaceLn(VarT,hm:getLn(VarT), hm:getLn(FunT)),
         maps:put(tVarName(VarT), Type, Map)
     end, maps:new(), CTypes),
+    ?PRINT(FunT),
+    ?PRINT(CTMap),
     CTMap_ = applyCtrsToCtrs(CTMap),
+    ?PRINT(CTMap_),
     NT = applyConstraints(FunT, CTMap_),
     NT;
 
@@ -865,7 +873,10 @@ applyConstraints(T, _) -> T.
 % Hack for recursive type constraints application
 applyCtrsToCtrs(CTMap) ->
     lists:foldl(fun({Var, Ty}, NMap) ->
+        ?PRINT(Var),
+        ?PRINT(Ty),
         NT = applyConstraints(Ty, CTMap),
+        ?PRINT(NT),
         maps:put(Var, NT, NMap)
         end
     , maps:new(), maps:to_list(CTMap)).
