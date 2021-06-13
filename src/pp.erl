@@ -1,4 +1,10 @@
 -module(pp).
+
+%% PRINT Debugging macro%%
+-ifndef(PRINT).
+-define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
+-endif.
+
 % Pre-processor
 -export([eraseAnn/1,getUDTs/1,getFns/1
         ,fmapPEFns/2,getModule/1,getRecs/1, getSpecs/1,getImprtdMods/1, getFile/1]).
@@ -46,5 +52,6 @@ getImprtdMods(Forms) ->
     lists:map(fun({attribute, _, import, {Name, _}}) -> Name end, MAs).
 
 getFile(Forms) ->
-    [{attribute,1,file,{File, _}}] = getAttributes(Forms, file),
+    Res = getAttributes(Forms, file),
+    [{attribute,{1, 1},file,{File, _}}] = getAttributes(Forms, file),
     File.
