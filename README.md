@@ -12,7 +12,7 @@ Build And Use
 -----
     # Installation
     git clone https://github.com/vrnithinkumar/ETC.git
-    cd mt/etc/ && rebar3 escriptize
+    rebar3 escriptize
 
     # Simple usage evaluation example
     ./etc hello.erl
