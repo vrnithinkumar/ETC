@@ -814,10 +814,10 @@ node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
         % NewVarT = hm:replaceLn(VarT,hm:getLn(VarT), hm:getLn(FunT)),
         maps:put(tVarName(VarT), Type, Map)
     end, maps:new(), CTypes),
-    ?PRINT(FunT),
-    ?PRINT(CTMap),
+    % ?PRINT(FunT),
+    % ?PRINT(CTMap),
     CTMap_ = applyCtrsToCtrs(CTMap),
-    ?PRINT(CTMap_),
+    % ?PRINT(CTMap_),
     NT = applyConstraints(FunT, CTMap_),
     NT;
 
@@ -873,10 +873,10 @@ applyConstraints(T, _) -> T.
 % Hack for recursive type constraints application
 applyCtrsToCtrs(CTMap) ->
     lists:foldl(fun({Var, Ty}, NMap) ->
-        ?PRINT(Var),
-        ?PRINT(Ty),
+        % ?PRINT(Var),
+        % ?PRINT(Ty),
         NT = applyConstraints(Ty, CTMap),
-        ?PRINT(NT),
+        % ?PRINT(NT),
         maps:put(Var, NT, NMap)
         end
     , maps:new(), maps:to_list(CTMap)).

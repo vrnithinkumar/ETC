@@ -581,6 +581,8 @@ bd_check(Env, Tvs, Term, {tMeta, _, Id_m, _, _, _} = Ty) ->
         ValidType -> bd_check(Env, Tvs, Term, ValidType)
     end;
 %%%%%%%%%%%%%%%%%check with special cases%%%%%%%%%%%%%%%%%
+bd_check(Env, _Tvs, {var, _L, '_'}, Type) ->
+    {Env, Type};
 bd_check(Env, Tvs, {var, L, X}, Type) ->
     case env:is_bound(X, Env) of
         true  ->
