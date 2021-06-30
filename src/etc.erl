@@ -786,10 +786,11 @@ node2type({type,L,nil,[]}) ->
     hm:tcon("list",[hm:fresh(L)],L);
 node2type({type, L, non_neg_integer,[]}) ->
     %TODO we have to remove
-    hm:bt(integer, L);
+    % ?PRINT(L),
+    hm:tcon("union", [hm:bt(integer, L), hm:bt(float, L)], L);
 node2type({type, L, pos_integer, []}) ->
     %TODO we have to remove once we support sub typing relation for integer +ve -ve integer
-    hm:bt(integer, L);
+    hm:tcon("union", [hm:bt(integer, L), hm:bt(float, L)], L);
 node2type({type, L, number, []}) ->
     %TODO we have to remove once we support sub typing relation for integer +ve -ve integer
     hm:tcon("union", [hm:bt(integer, L), hm:bt(float, L)], L);

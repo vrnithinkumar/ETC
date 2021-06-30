@@ -766,9 +766,11 @@ btc_synth(Env, _Tvs, {'fun',L,{function,X,ArgLen}}) ->
     {Env, T};
 btc_synth(Env, Tvs, {'if',_,Clauses}) ->
     {Env_1, CTs} = btc_synth_clauses(Env, Tvs, Clauses),
-    {Env_2, CT} = subsume_clauses(Env_1, Tvs, CTs),
+    EnvUnionEn = env:enableClauseUnion(Env_1),
+    {Env_2, CT} = subsume_clauses(EnvUnionEn, Tvs, CTs),
+    EnvUnionDis = env:disableClauseUnion(Env_2),
     RetType = hm:get_fn_rt(CT),
-    {Env_2, RetType};
+    {EnvUnionDis, RetType};
 btc_synth(Env, Tvs, {'fun',L,{function,X,ArgLen}}=Term) ->
     ?PRINT(Term),
     T = lookup({X,ArgLen},Env,L),
@@ -776,9 +778,12 @@ btc_synth(Env, Tvs, {'fun',L,{function,X,ArgLen}}=Term) ->
 btc_synth(Env, Tvs, {'case',_,Expr,Clauses}) ->
     {Env_1, EType} = btc_synth(Env, Tvs, Expr),
     {Env_2, CTs} = btc_synth_clauses(Env_1, Tvs, Clauses),
-    {Env_3, CT} = subsume_clauses(Env_2, Tvs, CTs),
+    EnvUnionEn = env:enableClauseUnion(Env_2),
+    {Env_3, CT} = subsume_clauses(EnvUnionEn, Tvs, CTs),
+    EnvUnionDis = env:disableClauseUnion(Env_3),
+    % EnvUnionEn
     Arg1Type = hd(hm:get_fn_args(CT)),
-    {Env_4, _} = subsume(Env_3, Tvs, EType, Arg1Type),
+    {Env_4, _} = subsume(EnvUnionDis, Tvs, EType, Arg1Type),
     RetType = hm:get_fn_rt(CT),
     {Env_4, RetType};
 btc_synth(Env, Tvs, {'receive',_,Clauses}) ->
