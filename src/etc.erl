@@ -779,6 +779,8 @@ node2type({var,L,X}) -> hm:tvar(X, L);
 node2type({type,L,nonempty_improper_list, [CT, _TT]}) ->
     % Terminal type needed to be taken cared of
     hm:tcon("list",[node2type(CT)],L);
+node2type({type,L,list,[]}) ->
+    hm:tcon("list",[hm:fresh(L)],L);
 node2type({type,L,nil,[]}) ->
     %TODO not sure we have to handle different
     hm:tcon("list",[hm:fresh(L)],L);
@@ -794,9 +796,10 @@ node2type({type, L, number, []}) ->
 node2type({type,L,T,[]}) -> hm:bt(T,L);
 node2type({type,L,tuple, any}) -> hm:tcon("tuple",[],L);
 node2type({type,L,tuple,Args}) -> hm:tcon("tuple",lists:map(fun node2type/1, Args),L);
-node2type({type,L,list,Args}) ->
+node2type({type,L,list, Args}) ->
     hm:tcon("list", lists:map(fun node2type/1, Args),L);
 node2type({type, L, nonempty_list, Args}) ->
+    ?PRINT(Args),
     % TODO not sure we have to handle different
     hm:tcon("list", lists:map(fun node2type/1, Args), L);
 node2type({type,L,union,Args}) -> hm:tcon("union",lists:map(fun node2type/1, Args), L);
@@ -982,8 +985,8 @@ getSpecWithAllFuns(Env, Specs) ->
 specToType(Env, {QFName, Types}) ->
     % {QFName, lists:map(fun node2type/1, Types)}.
     % We have to see how to handle multiple functions
+    % ?PRINT(Types),
     SpecT = hd(lists:map(fun node2type/1, Types)),
-    % ?PRINT(QFName),
     InPlaced = hm:inplaceUDT(Env, SpecT),
     RnkNSpec = hm:rankNSpec(InPlaced, sets:new()),
     {QFName, RnkNSpec}.
