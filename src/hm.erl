@@ -133,8 +133,8 @@ unify (T,U) ->
 eqType(X, X) -> true; % Exact same.
 eqType({bt,_,A}, {bt,_,B}) -> A == B;
 % hack for string to char[] check
-eqType({bt,_,string}, {tcon,_, "List", [{bt, _, char}]}) -> true;
-eqType({tcon,_, "List", [{bt, _, char}]}, {bt,_,string}) -> true;
+eqType({bt,_,string}, {tcon,_, "list", [{bt, _, char}]}) -> true;
+eqType({tcon,_, "list", [{bt, _, char}]}, {bt,_,string}) -> true;
 eqType({tvar,_,X}, {tvar,_,Y}) -> X == Y;
 eqType({funt,_,As1, B1}, {funt,_,As2, B2}) ->
     eqType(B1,B2) andalso util:eqLists(fun eqType/2,As1,As2);
@@ -452,27 +452,41 @@ prettify(Env, {tcon, _, N, As}) when not is_list(N)->
     , Env_, As);
 prettify(Env, {tcon, _, N, As}) ->
     case N of
-        "List" ->
+        "list" ->
             io:fwrite("["),
             E = util:interFoldEffect(
             fun(A,E) -> prettify(E,A) end
             , fun() -> io:fwrite(" ") end
             , Env, As),
             io:fwrite("]"),E;
-        "Tuple" ->
+        "tuple" ->
             io:fwrite("{"),
             E = util:interFoldEffect(
             fun(A,E) -> prettify(E,A) end
             , fun() -> io:fwrite(",") end
             , Env, As),
             io:fwrite("}"),E;
-        "Union" ->
+        "union" ->
             io:fwrite("("),
             E = util:interFoldEffect(
             fun(A,E) -> prettify(E,A) end
             , fun() -> io:fwrite("|") end
             , Env, As),
             io:fwrite(")"),E;
+        "map" ->
+            io:fwrite("["),
+            E = util:interFoldEffect(
+            fun(A,E) -> prettify(E,A) end
+            , fun() -> io:fwrite(",") end
+            , Env, As),
+            io:fwrite("]"),E;
+        "key-value" ->
+            io:fwrite(""),
+            E = util:interFoldEffect(
+            fun(A,E) -> prettify(E,A) end
+            , fun() -> io:fwrite("=>") end
+            , Env, As),
+            io:fwrite(""),E;
         _       -> 
             io:fwrite("~s ", [N]),
             util:interFoldEffect(
@@ -599,10 +613,15 @@ is_same_predicates(P1s,P2s)->
             lists:map(fun({P1, P2}) -> P1==P2 end, lists:zip(P1s,P2s))).
 
 %% Sub type relation checker
-isSubType({bt, _, any}, _) -> true;
-isSubType({bt, _, term}, _) -> true;
-isSubType(_, {bt, _, any}) -> true;
+% term as special case
 isSubType(_, {bt, _, term}) -> true;
+isSubType({bt, _, term}, _) -> true;
+% any as special case
+isSubType({bt, _, any}, _) -> true;
+isSubType(_, {bt, _, any}) -> true;
+% no_return as special case
+isSubType({bt, _, no_return}, _) -> true;
+isSubType(_, {bt, _, no_return}) -> true;
 isSubType({bt, _, T1}, {bt, _, T2}) -> T1 == T2;
 isSubType({tvar, _, A1}, {tvar, _, A2}) -> A1 == A2;
 isSubType(T1,{whilst,[],T2}) -> isSubType(T1, T2);
@@ -621,9 +640,9 @@ isSubType({tMeta, _, _, Tvs, null, Mono1}, {tMeta, _, _, Tvs, null, Mono2}) ->
 isSubType({tMeta, _, Id, Tvs, Type1, Mono1}, {tMeta, _, Id, Tvs, Type2, Mono2}) ->
     Mono1 == Mono2 and isSubType(Type1, Type2);
 isSubType({tSkol, _, Id}, {tSkol, _, Id}) -> true;
-% isSubType({tcon, _, "Union", Ts}, T) ->
+% isSubType({tcon, _, "union", Ts}, T) ->
 %     lists:any(fun(X) -> isSubType(T, X) end, Ts);
-isSubType(T, {tcon, _, "Union", Ts}) ->
+isSubType(T, {tcon, _, "union", Ts}) ->
     lists:any(fun(X) ->  isSubType(T, X) end, Ts);
 isSubType({tcon, _, N, A1s}, {tcon, _, N, A2s}) -> is_sub_types(A1s, A2s);
 isSubType(T1, T2) -> eqType(T1, T2).
@@ -716,7 +735,7 @@ generalizeTMeta ([TM|TMs], T) -> {forall, {tvar,getLn(T), TM}, [], generalizeTMe
 
 getListType(_Env, {bt, _, any}=T) -> T;
 getListType(_Env, {bt, _, term}=T) -> T;
-getListType(_Env, {tcon, _, "List", [LType]}) ->
+getListType(_Env, {tcon, _, "list", [LType]}) ->
     LType;
 getListType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
     {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
@@ -729,10 +748,10 @@ metaTupleTypeOfN(Env, N, L)->
         {Ei_, NM} = hm:freshTMeta(Ei, [], false, L),
         {Ei_, TMs ++ [NM]}
     end, {Env, []}, lists:seq(1, N)),
-    TupleType = hm:tcon("Tuple", TTs, L),
+    TupleType = hm:tcon("tuple", TTs, L),
     {Env_, TupleType}.
 
-getTupleType(_Env, {tcon, _, "Tuple", TTys}) ->
+getTupleType(_Env, {tcon, _, "tuple", TTys}) ->
     TTys;
 getTupleType(Env, {tMeta, _ , Id_m, _, _, _}=TM) ->
     {tMeta, _, Id_m, _, Type, _} = env:get_meta(Env, Id_m),
@@ -813,7 +832,7 @@ inplaceUDT (Env, {tcon, L, Name, Args} = T) when is_atom(Name) ->
             % Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
             % {tcon, L, Name, Args_}
     end;
-%% tcon like "List", Tuple, "Union"
+%% tcon like "list", tuple, "union"
 inplaceUDT (Env, {tcon, L, Name, Args}) ->
     Args_ = lists:map(fun (A)-> inplaceUDT(Env, A) end, Args),
     {tcon, L, Name, Args_};

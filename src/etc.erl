@@ -223,7 +223,7 @@ infer(_,{integer,L,_}) ->
     X = hm:fresh(L),
     {X,[],[{class,"Num",X}]};
 infer(_, {string,L,_}) ->
-    {hm:tcon("List", [hm:bt(char,L)],L),[],[]};
+    {hm:tcon("list", [hm:bt(char,L)],L),[],[]};
 infer(_,{char,L,_}) ->
     {hm:bt(char,L),[],[]};
 infer(_,{float,L,_}) ->
@@ -298,13 +298,13 @@ infer(Env,{'fun',L,{function,X,ArgLen}}) ->
     {T, Ps} = lookup({X,ArgLen},Env,L),
     {T,[],Ps};
 infer(_,{nil,L}) ->
-    {hm:tcon("List",[hm:fresh(L)],L),[],[]};
+    {hm:tcon("list",[hm:fresh(L)],L),[],[]};
 infer(Env,{cons,L,H,T}) ->
     {HType,HCs,HPs} = infer(Env, H),
     {TType,TCs,TPs} = infer(Env, T),
     % generate a fresh "List V"
     V = hm:fresh(L), 
-    LType = hm:tcon("List", [V],L),
+    LType = hm:tcon("list", [V],L),
     {LType, HCs ++ TCs ++ 
         unify(HType,V) ++   % unify head type with "V" 
         unify(TType,LType)  % unify tail type with "List V"
@@ -317,7 +317,7 @@ infer(Env,{tuple,L,Es}) ->
                             {T,Cs,Ps} = infer(Env,X),
                             {AccT ++ [T], AccCs ++ Cs, AccPs ++ Ps}
                         end, {[],[],[]}, Es),
-        {hm:tcon("Tuple",Ts,L),Cs,Ps}
+        {hm:tcon("tuple",Ts,L),Cs,Ps}
     end,
     case Es of
         % if first element of tuple is an atom,
@@ -369,7 +369,7 @@ infer(Env,{match,_,LNode,RNode}) ->
 infer(Env,{lc,L,Expr,Defs}) ->
     {Env_,DefCs,DefPs} = checkLCDefs(Env,Defs),
     {T, ExprCs, ExprPs} = infer(Env_,Expr),
-    {hm:tcon("List", [T],L), DefCs ++ ExprCs, DefPs ++ ExprPs};
+    {hm:tcon("list", [T],L), DefCs ++ ExprCs, DefPs ++ ExprPs};
 infer(Env,{block,_,Exprs}) ->
     {Env_, CsBody, PsBody} = lists:foldl(fun(Expr, {Ei,Csi,Psi}) -> 
         {Ei_,Csi_,Psi_} = checkExpr(Ei,Expr),
@@ -631,7 +631,7 @@ checkLCDefs(Env,Exprs) ->
             {generate,L,{var,_,X},List} ->
                 {ActualListType,Cs,Ps} = infer(AccEnv,List),
                 XType = hm:fresh(L),
-                ExpectedListType = hm:tcon("List", [XType],L),
+                ExpectedListType = hm:tcon("list", [XType],L),
                 {env:extend(X,XType,AccEnv) 
                     , unify(ActualListType,ExpectedListType) ++ Cs ++ AccCs
                     , Ps ++ AccPs};
@@ -776,9 +776,12 @@ getConstrTypes(Type, DataConstrs) ->
 -spec node2type(erl_syntax:syntaxTree()) -> hm:type().
 node2type({var,L,'_'}) -> hm:bt(any, L);
 node2type({var,L,X}) -> hm:tvar(X, L);
+node2type({type,L,nonempty_improper_list, [CT, _TT]}) ->
+    % Terminal type needed to be taken cared of
+    hm:tcon("list",[node2type(CT)],L);
 node2type({type,L,nil,[]}) ->
     %TODO not sure we have to handle different
-    hm:tcon("List",[hm:fresh(L)],L);
+    hm:tcon("list",[hm:fresh(L)],L);
 node2type({type, L, non_neg_integer,[]}) ->
     %TODO we have to remove
     hm:bt(integer, L);
@@ -787,19 +790,19 @@ node2type({type, L, pos_integer, []}) ->
     hm:bt(integer, L);
 node2type({type, L, number, []}) ->
     %TODO we have to remove once we support sub typing relation for integer +ve -ve integer
-    hm:tcon("Union", [hm:bt(integer, L), hm:bt(float, L)], L);
+    hm:tcon("union", [hm:bt(integer, L), hm:bt(float, L)], L);
 node2type({type,L,T,[]}) -> hm:bt(T,L);
-node2type({type,L,tuple, any}) -> hm:tcon("Tuple",[],L);
-node2type({type,L,tuple,Args}) -> hm:tcon("Tuple",lists:map(fun node2type/1, Args),L);
+node2type({type,L,tuple, any}) -> hm:tcon("tuple",[],L);
+node2type({type,L,tuple,Args}) -> hm:tcon("tuple",lists:map(fun node2type/1, Args),L);
 node2type({type,L,list,Args}) ->
-    hm:tcon("List", lists:map(fun node2type/1, Args),L);
+    hm:tcon("list", lists:map(fun node2type/1, Args),L);
 node2type({type, L, nonempty_list, Args}) ->
     % TODO not sure we have to handle different
-    hm:tcon("List", lists:map(fun node2type/1, Args), L);
-node2type({type,L,union,Args}) -> hm:tcon("Union",lists:map(fun node2type/1, Args), L);
+    hm:tcon("list", lists:map(fun node2type/1, Args), L);
+node2type({type,L,union,Args}) -> hm:tcon("union",lists:map(fun node2type/1, Args), L);
 node2type({type, L, map, any}) ->
     AnyToAny = hm:tcon("key-value",[hm:bt(any, L), hm:bt(any, L)],L),
-    hm:tcon("map", AnyToAny, L);
+    hm:tcon("map", [AnyToAny], L);
 node2type({type, L, map, Args}) ->  hm:tcon("map",lists:map(fun node2type/1, Args), L);
 node2type({type, L, map_field_assoc, Args}) -> hm:tcon("key-value",lists:map(fun node2type/1, Args),L);
 node2type({ann_type,_L,[_TVar, TNode]}) -> node2type(TNode);
@@ -818,6 +821,7 @@ node2type({type,_L,'bounded_fun', [Func, Constraints]}) ->
     % ?PRINT(CTMap),
     CTMap_ = applyCtrsToCtrs(CTMap),
     % ?PRINT(CTMap_),
+    % ?PRINT(FunT),
     NT = applyConstraints(FunT, CTMap_),
     NT;
 
@@ -860,6 +864,14 @@ applyConstraints({'funt',L,Args,RType}, CTMap) ->
         false -> applyConstraints(RType, CTMap)
     end,
     hm:funt(SubstitutedArgs, SubstitutedRType, L);
+% applyConstraints({tcon, L, "map", {tcon, L_KV,"key-value",KVs}}, CTMap) ->
+%     KVs_ = lists:map(fun(Arg)->
+%         case maps:is_key(tVarName(Arg), CTMap) of
+%             true -> maps:get(tVarName(Arg), CTMap);
+%             false -> applyConstraints(Arg, CTMap)
+%         end
+%     end , KVs),
+%     {tcon, L, "map", {tcon,L_KV,"key-value",KVs_}};
 applyConstraints({tcon, L, Name, Args}, CTMap) ->
     Args_ = lists:map(fun(Arg)->
         case maps:is_key(tVarName(Arg), CTMap) of
@@ -971,7 +983,7 @@ specToType(Env, {QFName, Types}) ->
     % {QFName, lists:map(fun node2type/1, Types)}.
     % We have to see how to handle multiple functions
     SpecT = hd(lists:map(fun node2type/1, Types)),
-    % ?PRINT(SpecT),
+    % ?PRINT(QFName),
     InPlaced = hm:inplaceUDT(Env, SpecT),
     RnkNSpec = hm:rankNSpec(InPlaced, sets:new()),
     {QFName, RnkNSpec}.

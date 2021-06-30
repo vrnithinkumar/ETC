@@ -164,15 +164,15 @@ unify(Env, Tvs, {funt, _, Args_A, Ret_A}, {funt, _, Args_B, Ret_B}) ->
     {Env_, Args} = unifyList(Env, Tvs, Args_A, Args_B),
     {Env__, Ret_U} = unify(Env_, Tvs, Ret_A, Ret_B),
     {Env__, hm:funt(Args, Ret_U, 0)};
-unify(Env, _Tvs, {tcon, _, "Tuple", _} = T, {tcon, _, "Tuple", []}) ->
+unify(Env, _Tvs, {tcon, _, "tuple", _} = T, {tcon, _, "tuple", []}) ->
     %% Handle the case where empty 'tuple()' type
     %% used for generic and dynamic n-sized tuples.
     {Env, T};
-unify(Env, _Tvs, {tcon, _, "Tuple", []}, {tcon, _, "Tuple", _} = T) ->
+unify(Env, _Tvs, {tcon, _, "tuple", []}, {tcon, _, "tuple", _} = T) ->
     %% Handle the case where empty 'tuple()' type
     %% used for generic and dynamic n-sized tuples.
     {Env, T};
-unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
+unify(Env, Tvs, {tcon, _, "union", _} = A, B) ->
     %% union subtype unify
     % ?PRINT(A),
     % ?PRINT(B),
@@ -180,7 +180,7 @@ unify(Env, Tvs, {tcon, _, "Union", _} = A, B) ->
         uni_failed -> unifyFailed(A, B);
         Res -> Res
     end;
-unify(Env, Tvs, A, {tcon, _, "Union", _} = B) ->
+unify(Env, Tvs, A, {tcon, _, "union", _} = B) ->
     % ?PRINT(A),
     % ?PRINT(B),
     case unionSubsume(Env, Tvs, A, B) of 
@@ -238,14 +238,29 @@ unifyFailed(A, B) ->
 
 % A <: (B|C) => (A <: B) or (A <: C)
 % handle empty tmeta
-unionSubsume(Env, Tvs, {tMeta, _, Id_m, _, _, _}= TM, {tcon, _, "Union", _}=RU) ->
+unionSubsume(Env, Tvs, {tMeta, _, Id_m, _, _, _}= TM, {tcon, _, "union", _}=RU) ->
     {tMeta, L, Id_m, Tvs_m, Type, Mono} = env:get_meta(Env, Id_m),
     case Type of
         %% Replace incase of empty TMeta
-        null -> {Env, {tMeta, L, Id_m, Tvs_m, RU, Mono}};
+        null ->
+            Env_1 = update_tmeta_type(Env, TM, RU),
+            {Env_1, {tMeta, L, Id_m, Tvs_m, RU, Mono}};
         Type -> unionSubsume(Env, Tvs, Type, RU)
     end;
-unionSubsume(Env, Tvs, {tcon, _, "Union", L_Types}=L, {tcon, _, "Union", _}=R) ->
+unionSubsume(Env, Tvs, {tcon, _, "union", _}=LU, {tMeta, _, Id_m, _, _, _}= TM) ->
+    {tMeta, L, Id_m, Tvs_m, Type, Mono} = env:get_meta(Env, Id_m),
+    % ?PRINT(Id_m),
+    % ?PRINT(Type),
+    % ?PRINT(Types),
+    % trySubsumeLeftUnion(Env, Tvs, TM, Types);
+    case Type of
+        %% Replace incase of empty TMeta
+        null ->
+            Env_1 = update_tmeta_type(Env, TM, LU),
+            {Env_1, {tMeta, L, Id_m, Tvs_m, LU, Mono}};
+        Type -> unionSubsume(Env, Tvs, LU, Type)
+    end;
+unionSubsume(Env, Tvs, {tcon, _, "union", L_Types}=L, {tcon, _, "union", _}=R) ->
     Env_ = lists:foldr(fun(Ty, Ei) ->
         Ei_ = case unionSubsume(Ei, Tvs, Ty, R) of
             uni_failed -> unifyFailed(Ty, R);
@@ -254,9 +269,9 @@ unionSubsume(Env, Tvs, {tcon, _, "Union", L_Types}=L, {tcon, _, "Union", _}=R) -
         Ei_
     end, Env, L_Types),
     {Env_, L};
-unionSubsume(Env, Tvs, A, {tcon, _, "Union", Types}) ->
+unionSubsume(Env, Tvs, A, {tcon, _, "union", Types}) ->
     trySubsumeRightUnion(Env, Tvs, A, Types);
-unionSubsume(Env, Tvs, {tcon, _, "Union", Types}, R) ->
+unionSubsume(Env, Tvs, {tcon, _, "union", Types}, R) ->
     trySubsumeLeftUnion(Env, Tvs, R, Types).
 
 trySubsumeRightUnion(_Env, _Tvs, _A, []) ->
@@ -525,9 +540,10 @@ pickArg_(Env, Acc_Done, [{F,S} | Acc_Rem]) ->
 
 synthAndSubsume(Env, Tvs, Term, Ty) ->
     {Env_, Inf} = btc_synth(Env, Tvs, Term),
-    % ?PRINT(Term),
     % ?PRINT(Inf),
+    % printType(Env_, Inf),
     % ?PRINT(Ty),
+    % printType(Env_, Ty),
     subsume(Env_, Tvs, Inf, Ty).
 
 type_check(Env, F) ->
@@ -542,7 +558,7 @@ type_check(Env, F) ->
 
 do_btc_check(Env, F, SpecFT) ->
     FunQName = util:getFnQName(F),
-    % ?PRINT(FunQName),
+    ?PRINT(FunQName),
     % ?PRINT(SpecFT),
     UdtInTy = hm:inplaceUDT(Env, SpecFT),
     % ?PRINT(UdtInTy),
@@ -558,7 +574,7 @@ do_btc_check(Env, F, SpecFT) ->
 
 do_btc_infer(Env, F) ->
     FunQName = util:getFnQName(F),
-    % ?PRINT(FunQName),
+    ?PRINT(FunQName),
     {SEnv, STy} = btc_synth(Env, [], F),
     % ?PRINT(env:get_meta_map(SEnv)),
     % ?PRINT(STy),
@@ -641,15 +657,13 @@ bd_check(Env, Tvs, Node, Type) ->
                 synthAndSubsume(Env, Tvs, Node, Type)
         end.
 
-
-
 -spec btc_synth(hm:env(), [any()], erl_syntax:syntaxTree()) ->
     {hm:env(), hm:type()}.
 btc_synth(Env, _Tvs, {integer, L, _}) ->
     Inferred = hm:bt(integer, L),
     {Env, Inferred};
 btc_synth(Env, _Tvs, {string, L,_}) ->
-    Inferred = hm:tcon("List", [hm:bt(char,L)],L),
+    Inferred = hm:tcon("list", [hm:bt(char,L)],L),
     {Env, Inferred};
 btc_synth(Env, _Tvs, {char, L,_}) ->
     Inferred = hm:bt(char,L),
@@ -665,15 +679,15 @@ btc_synth(Env, _Tvs, {atom,L,X}) ->
     {Env, Inferred};
 btc_synth(Env, Tvs, {nil, L}) ->
     {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
-    ListType = hm:tcon("List", [A], L),
+    ListType = hm:tcon("list", [A], L),
     {Env_1, ListType};
 btc_synth(Env, Tvs, {cons, L, Head, Tail}) ->
     {Env_1, HType} = btc_synth(Env, Tvs, Head),
     {Env_2, TType} = btc_synth(Env_1, Tvs, Tail),
-    % generate a fresh "List"
+    % generate a fresh "list"
     %% Not sure we need to create new fresh meta list %%
     % {Env_3, A} = hm:freshTMeta(Env_2, Tvs, L),
-    LType = hm:tcon("List", [HType], L),
+    LType = hm:tcon("list", [HType], L),
     % {Env_4, _AU} = subsume(Env_3, Tvs, A, HType),
     {Env_5, _LU} = subsume(Env_2, Tvs, LType, TType),
     {Env_5, LType};
@@ -683,8 +697,15 @@ btc_synth(Env, Tvs, {tuple, L, Es}) ->
             {Ei_, T} = btc_synth(Ei, Tvs, X),
             {Ei_, AccT ++ [T]}
         end, {Env,[]}, Es),
-    TupleType = hm:tcon("Tuple", TTs, L),
+    TupleType = hm:tcon("tuple", TTs, L),
     {Env_, TupleType};
+btc_synth(Env, _Tvs, {map, L, []}) ->
+    AnyToAny = hm:tcon("key-value",[hm:bt(any, L), hm:bt(any, L)],L),
+    {Env, hm:tcon("map", [AnyToAny], L)};
+btc_synth(Env, _Tvs, {map, L, Kvs}) ->
+    ?PRINT(Kvs),
+    AnyToAny = hm:tcon("key-value",[hm:bt(any, L), hm:bt(any, L)],L),
+    {Env, hm:tcon("map", [AnyToAny], L)};
 btc_synth(Env, Tvs, {var, L, '_'}) ->
     hm:freshTMeta(Env, Tvs, true, L);
 btc_synth(Env, Tvs, {var, L, X}) ->
@@ -710,14 +731,17 @@ btc_synth(Env, Tvs, {op, L, BOp, E1, E2}) ->
     Arg1Type = hd(hm:get_fn_args(OpenedType)),
     Arg2Type = lists:last(hm:get_fn_args(OpenedType)),
     RetType = hm:get_fn_rt(OpenedType),
+    % ?PRINT(Arg1Type),
+    % ?PRINT(RetType),
     {Env1, _T1} = bd_check(Env_, Tvs, E1, Arg1Type),
+    % ?PRINT(_T1),
     {Env2, _T2} = bd_check(Env1, Tvs, E2, Arg2Type),
+    % ?PRINT(RetType),
     {Env2, RetType};
 btc_synth(Env, Tvs, {call,L,F,Args}) ->
     {Env_0, FT }= synthFnCall(Env, F, length(Args)),
-    % ?PRINT(FT),
     % {Env_0, FT_} = applyEnvAndPrune(Env, FT),
-    % ?PRINT(FT_),
+    % ?PRINT(FT),
     {Env_1, Fresh_FT} = genAndOpenFnCallTy(Env_0, Tvs, FT),
     % ?PRINT(Fresh_FT),
     {Env_2, OpenedType} = open_op_type(Env_1, Tvs, Fresh_FT),
@@ -776,6 +800,8 @@ btc_synth(Env, Tvs, {clause, L, _, _, _}=Clause) ->
     % ?PRINT(LstBdy),
     {Env_4, _} = bd_check(Env_3, Tvs, LstBdy, B),
     FT = hm:funt(As, B, L),
+    % printType(Env_4, FT),
+    % ?PRINT(FT),
     {Env_4, FT};
 btc_synth(Env, Tvs, Node) ->
     case type(Node) of
@@ -943,11 +969,13 @@ open_op_type(Env, Tvs, {forall, _, C, _} = Ty) ->
     Env_2 = case C of
         [{class, CName, _ }] ->
             CUT = type_class_to_union(CName),
+            % ?PRINT(CUT),
             update_tmeta_type(Env_1, M, CUT);
         _ -> Env_1
     end,
     % ?PRINT(Ty),
     Opened = hm:openTForall(Ty, M),
+    % ?PRINT(env:get_meta_map(Env_2)),
     % ?PRINT(Opened),
     % ?PRINT(Opened),
     open_op_type(Env_2, Tvs, Opened);
@@ -984,7 +1012,7 @@ latest_tmeta_type(Env, {tMeta, _, Id, _, _, _})->
 
 type_class_to_union(CName)->
     CTs = hm:get_all_class_types(CName),
-    hm:tcon("Union", CTs, 0).
+    hm:tcon("union", CTs, 0).
 
 synth_clause_patterns(Env, _, []) ->
     {Env, []};
@@ -1069,7 +1097,7 @@ unifyWithUnion(Env, Tvs, T1, T2) ->
         Res -> Res
     catch
         _:_ ->
-            {Env, {tcon, util:getLn(T1), "Union", [T1, T2]}}
+            {Env, {tcon, util:getLn(T1), "union", [T1, T2]}}
     end.
 
 %%%%%%%%%%%%Test & Debug%%%%%%%%%%%%
@@ -1086,7 +1114,7 @@ printType(Env, T) ->
 %     Inf = hm:bt(integer, L),
 %     subsume(Env, Tvs, Inf, Type);
 % btc_check(Env, Tvs, {string, L,_}, Type) ->
-%     Inf= hm:tcon("List", [hm:bt(char,L)],L),
+%     Inf= hm:tcon("list", [hm:bt(char,L)],L),
 %     subsume(Env, Tvs, Inf, Type);
 % btc_check(Env, Tvs, {char, L,_}, Type) ->
 %     Inf= hm:bt(char,L),
@@ -1102,7 +1130,7 @@ printType(Env, T) ->
 %     subsume(Env, Tvs, Inf, Type);
 % btc_check(Env, Tvs, {nil, L}, Type) ->
 %     {Env_1, A} = hm:freshTMeta(Env, Tvs, L),
-%     ListType = hm:tcon("List", [A], L),
+%     ListType = hm:tcon("list", [A], L),
 %     subsume(Env_1, Tvs, ListType, Type);
 % % btc_check(Env, Tvs, {cons, L, Head, Tail}, Type) ->
 % %     % ?PRINT(Head),
@@ -1111,7 +1139,7 @@ printType(Env, T) ->
 % %     {Env_1, TType} = btc_check(Env, Tvs, Tail, Type),
 % %     {Env_2, A} = hm:freshTMeta(Env_1, Tvs, L),
 % %     {Env_3, _HT} = btc_check(Env_2, Tvs, Head, A),
-% %     LType = hm:tcon("List", [A], L),
+% %     LType = hm:tcon("list", [A], L),
 % %     % {Env_4, LT} = subsume(Env_3, Tvs, LType, TType),
 % %     subsume(Env_3, Tvs, LType, Type);
 % %     % subsume(Env_4, Tvs, LT, Type);
