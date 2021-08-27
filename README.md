@@ -28,7 +28,7 @@ Build And Use
 
 Run Tests
 -----
-    cd ./testsuits
+    cd ./testsuit
     bash run.sh
 
 Using With Rebar3
